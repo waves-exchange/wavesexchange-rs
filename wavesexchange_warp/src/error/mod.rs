@@ -5,9 +5,13 @@ mod response;
 pub use constructors::*;
 pub use response::{Error, Response};
 
-use std::{convert::Infallible, sync::Arc};
 use futures::future::Ready;
-use warp::{reject::Reject, Rejection, Reply};
+use std::{convert::Infallible, sync::Arc};
+use warp::{
+    reject::InvalidHeader,
+    reject::{MissingHeader, Reject},
+    Rejection, Reply,
+};
 
 pub fn handler<E: Reject>(
     error_code_prefix: u16,
@@ -22,6 +26,11 @@ pub fn handler<E: Reject>(
             resp = not_found(error_code_prefix.clone());
         } else if let Some(_) = r.find::<warp::filters::body::BodyDeserializeError>() {
             resp = validation::body_deserialization(error_code_prefix.clone());
+        // todo header name
+        } else if let Some(_) = r.find::<InvalidHeader>() {
+            resp = validation::invalid_header(error_code_prefix.clone());
+        } else if let Some(_) = r.find::<MissingHeader>() {
+            resp = validation::missing_header(error_code_prefix.clone());
         } else if let Some(crate_error) = r.find::<E>() {
             resp = handler(crate_error);
         } else {

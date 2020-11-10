@@ -1,5 +1,4 @@
-use wavesexchange_log::{info, error as log_error};
-use warp::Rejection;
+use wavesexchange_log::info;
 
 pub fn access(info: warp::log::Info) {
     let req_id = info
@@ -18,9 +17,4 @@ pub fn access(info: warp::log::Info) {
         "ip" => info.remote_addr().map(|a| format!("{}", a.ip())),
         "protocol" => format!("{:?}", info.version())
     );
-}
-
-pub async fn error(err: Rejection) -> Result<(), Rejection> {
-	log_error!(err);
-	Err(err)
 }
