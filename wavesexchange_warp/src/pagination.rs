@@ -1,5 +1,5 @@
 use serde::Serialize;
-#[derive(Default, Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PageInfo {
     pub has_next_page: bool,
     pub last_cursor: String,
