@@ -7,47 +7,19 @@ pub struct PageInfo {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename = "list")]
-pub struct List<T: TypeTag + Serialize> {
+pub struct List<T: Serialize> {
     pub page_info: PageInfo,
-    #[serde(with = "WithType")]
     pub items: Vec<T>,
 }
-
-pub trait TypeTag {
-    const TYPE: &'static str;
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(remote = "T")]
-struct WithType<T: TypeTag> {
-    #[serde(rename = "type")]
-    type_tag: String,
-    #[serde(flatten)]
-    t: T,
-}
-
-// struct WithType<T: TypeTag>(T)
-
-// impl<T: TypeTag> WithType<T> {
-//     pub fn new(t: T) -> Self {
-//         Self {
-//             type_tag: T::TYPE.to_owned(),
-//             t: t,
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[derive(Serialize)]
+    #[serde(tag = "type", rename = "foo")]
     struct Foo {
         foo: u16,
-    }
-
-    impl TypeTag for Foo {
-        const TYPE: &'static str = "foo_type";
     }
 
     #[test]
@@ -64,6 +36,6 @@ mod tests {
             items: items,
         };
 
-        assert_eq!(serde_json::to_string(&list).unwrap(), "{\"type\":\"list\",\"page_info\":{\"has_next_page\":false,\"last_cursor\":\"last_foo\"},\"items\":[{\"type\":\"foo_type\",\"foo\":0}]}");
+        assert_eq!(serde_json::to_string(&list).unwrap(), "{\"type\":\"list\",\"page_info\":{\"has_next_page\":false,\"last_cursor\":\"last_foo\"},\"items\":[{\"type\":\"foo\",\"foo\":0}]}");
     }
 }
