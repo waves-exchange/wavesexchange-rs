@@ -13,6 +13,8 @@ use warp::{
     Rejection, Reply,
 };
 
+use crate::query::QueryStringDeserializationError;
+
 pub fn handler<E: Reject>(
     error_code_prefix: u16,
     handle: impl Fn(&E) -> Response,
@@ -27,6 +29,9 @@ pub fn handler<E: Reject>(
         } else if let Some(_) = r.find::<warp::filters::body::BodyDeserializeError>() {
             resp = validation::body_deserialization(error_code_prefix.clone());
         // todo header name
+        } else if let Some(_) = r.find::<QueryStringDeserializationError>() {
+            // todo proper qs deserialization error
+            resp = validation::invalid_parameter(error_code_prefix.clone());
         } else if let Some(_) = r.find::<InvalidHeader>() {
             resp = validation::invalid_header(error_code_prefix.clone());
         } else if let Some(_) = r.find::<MissingHeader>() {
