@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PageInfo {
     pub has_next_page: bool,
-    pub last_cursor: String,
+    pub last_cursor: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -26,7 +26,7 @@ mod tests {
     fn data_serialization() {
         let page_info = PageInfo {
             has_next_page: false,
-            last_cursor: "last_foo".to_owned(),
+            last_cursor: Some("last_foo".to_owned()),
         };
 
         let items = vec![Foo { foo: 0 }];
@@ -47,6 +47,34 @@ mod tests {
 
         assert_eq!(deserialized.items.first().unwrap().foo, 0);
         assert_eq!(deserialized.page_info.has_next_page, false);
-        assert_eq!(deserialized.page_info.last_cursor, "last_foo".to_owned());
+        assert_eq!(deserialized.page_info.last_cursor, Some("last_foo".to_owned()));
+    }
+
+    #[test]
+    fn empty_data_serialization() {
+        let page_info = PageInfo {
+            has_next_page: false,
+            last_cursor: None,
+        };
+
+        let items: Vec<Foo> = vec![];
+
+        let list = List {
+            page_info: page_info,
+            items: items,
+        };
+
+        assert_eq!(serde_json::to_string(&list).unwrap(), "{\"type\":\"list\",\"page_info\":{\"has_next_page\":false,\"last_cursor\":null},\"items\":[]}");
+    }
+
+    #[test]
+    fn empty_data_deserialization() {
+        let data = "{\"type\":\"list\",\"page_info\":{\"has_next_page\":false,\"last_cursor\":null},\"items\":[]}";
+
+        let deserialized = serde_json::from_str::<List<Foo>>(data).unwrap();
+
+        assert_eq!(deserialized.items.is_empty(), true);
+        assert_eq!(deserialized.page_info.has_next_page, false);
+        assert_eq!(deserialized.page_info.last_cursor, None);
     }
 }
