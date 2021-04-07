@@ -16,7 +16,7 @@ pub fn access(info: warp::log::Info) {
         "method" => info.method().to_string(),
         "status" => info.status().as_u16(),
         "ua" => info.user_agent(),
-        "latency" => info.elapsed().as_millis(),
+        "latency" => info.elapsed().as_millis() as u64,
         "req_id" => req_id,
         "ip" => ip,
         "protocol" => format!("{:?}", info.version())
