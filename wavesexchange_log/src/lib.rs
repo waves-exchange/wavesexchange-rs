@@ -8,10 +8,8 @@ pub static LOGGER: Lazy<slog::Logger> = Lazy::new(|| init_logger());
 
 fn init_logger() -> Logger {
     let drain = slog_json::Json::new(std::io::stdout()).build().fuse();
-    let drain = slog_async::Async::new(slog_envlogger::new(drain))
-        .chan_size(1000)
-        .build()
-        .fuse();
+    let drain = slog_async::Async::new(drain).chan_size(1000).build().fuse();
+    let drain = slog_envlogger::new(drain).fuse();
 
     slog::Logger::root(
         Mutex::new(drain).map(slog::Fuse),
