@@ -19,7 +19,7 @@ fn topic_convert_test() {
     let urls = [
         "topic://config/some/path",
         "topic://state/address/key",
-        "topic://test.resource/some/path?and_query=true",
+        "topic://test_resource/some/path?and_query=true",
         "topic://blockchain_height",
         "topic://transactions?type=all&address=some_address",
         "topic://transactions?type=exchange&amount_asset=foo&price_asset=bar",
@@ -27,7 +27,7 @@ fn topic_convert_test() {
     ];
     for s in urls.iter() {
         let topic = Topic::try_from(*s).unwrap();
-        let other_s = topic.to_string();
+        let other_s: String = topic.into();
         assert_eq!(*s, other_s);
     }
 }
@@ -47,7 +47,7 @@ impl TryFrom<&str> for Topic {
                 let state = State::try_from(url)?;
                 Ok(Topic::State(state))
             }
-            Some("test.resource") => {
+            Some("test_resource") => {
                 let ps = TestResource::try_from(url)?;
                 Ok(Topic::TestResource(ps))
             }
@@ -65,17 +65,17 @@ impl TryFrom<&str> for Topic {
     }
 }
 
-impl ToString for Topic {
-    fn to_string(&self) -> String {
+impl From<Topic> for String {
+    fn from(v: Topic) -> String {
         let mut result = "topic://".to_string();
-        match self {
-            Topic::Config(cp) => result.push_str(cp.to_string().as_str()),
-            Topic::State(state) => result.push_str(state.to_string().as_str()),
-            Topic::TestResource(ps) => result.push_str(ps.to_string().as_str()),
+        match v {
+            Topic::Config(cp) => result.push_str(&String::from(cp)),
+            Topic::State(state) => result.push_str(&String::from(state)),
+            Topic::TestResource(ps) => result.push_str(&String::from(ps)),
             Topic::BlockchainHeight => result.push_str("blockchain_height"),
-            Topic::Transaction(tx) => result.push_str(tx.to_string().as_str()),
+            Topic::Transaction(tx) => result.push_str(&String::from(tx)),
             Topic::LeasingBalance(leasing_balance) => {
-                result.push_str(leasing_balance.to_string().as_str())
+                result.push_str(&String::from(leasing_balance))
             }
         }
         result
@@ -97,9 +97,9 @@ impl TryFrom<Url> for ConfigFile {
     }
 }
 
-impl ToString for ConfigFile {
-    fn to_string(&self) -> String {
-        "config".to_owned() + &self.path
+impl From<ConfigFile> for String {
+    fn from(v: ConfigFile) -> String {
+        "config".to_owned() + &v.path
     }
 }
 
@@ -108,9 +108,9 @@ pub struct ConfigParameters {
     pub file: ConfigFile,
 }
 
-impl ToString for ConfigParameters {
-    fn to_string(&self) -> String {
-        self.file.to_string()
+impl From<ConfigParameters> for String {
+    fn from(v: ConfigParameters) -> String {
+        v.file.into()
     }
 }
 
@@ -142,9 +142,9 @@ pub struct State {
     pub key: String,
 }
 
-impl ToString for State {
-    fn to_string(&self) -> String {
-        format!("state/{}/{}", self.address.clone(), self.key.clone())
+impl From<State> for String {
+    fn from(v: State) -> String {
+        format!("state/{}/{}", v.address, v.key)
     }
 }
 
@@ -183,7 +183,7 @@ fn topic_state_test() {
     let state = State::try_from(url).unwrap();
     assert_eq!(state.address, "some_address".to_string());
     assert_eq!(state.key, "some_key".to_string());
-    let state_string = state.to_string();
+    let state_string: String = state.into();
     assert_eq!("state/some_address/some_key".to_string(), state_string);
 }
 
@@ -193,10 +193,10 @@ pub struct TestResource {
     pub query: Option<String>,
 }
 
-impl ToString for TestResource {
-    fn to_string(&self) -> String {
-        let mut s = "test.resource".to_owned() + &self.path;
-        if let Some(ref query) = self.query {
+impl From<TestResource> for String {
+    fn from(v: TestResource) -> String {
+        let mut s = "test_resource".to_owned() + &v.path;
+        if let Some(ref query) = v.query {
             s = s + "?" + query;
         }
         s
@@ -231,8 +231,8 @@ impl TryFrom<Url> for BlockchainHeight {
     }
 }
 
-impl ToString for BlockchainHeight {
-    fn to_string(&self) -> String {
+impl From<BlockchainHeight> for String {
+    fn from(_: BlockchainHeight) -> String {
         "blockchain_height".to_string()
     }
 }
@@ -325,29 +325,26 @@ fn get_value_from_query(value: &Url, key: &str) -> Result<String, Error> {
         })
 }
 
-impl ToString for Transaction {
-    fn to_string(&self) -> String {
-        match self {
-            Self::ByAddress(by_address) => by_address.to_string(),
-            Self::Exchange(exchange) => exchange.to_string(),
+impl From<Transaction> for String {
+    fn from(v: Transaction) -> String {
+        match v {
+            Transaction::ByAddress(by_address) => by_address.into(),
+            Transaction::Exchange(exchange) => exchange.into(),
         }
     }
 }
 
-impl ToString for TransactionByAddress {
-    fn to_string(&self) -> String {
-        format!(
-            "transactions?type={}&address={}",
-            self.tx_type, self.address
-        )
+impl From<TransactionByAddress> for String {
+    fn from(v: TransactionByAddress) -> String {
+        format!("transactions?type={}&address={}", v.tx_type, v.address)
     }
 }
 
-impl ToString for TransactionExchange {
-    fn to_string(&self) -> String {
+impl From<TransactionExchange> for String {
+    fn from(v: TransactionExchange) -> String {
         format!(
             "transactions?type=exchange&amount_asset={}&price_asset={}",
-            self.amount_asset, self.price_asset
+            v.amount_asset, v.price_asset
         )
     }
 }
@@ -378,7 +375,7 @@ fn transaction_topic_test() {
         assert_eq!(transaction.address, "some_address".to_string());
         assert_eq!(
             "topic://transactions?type=all&address=some_address".to_string(),
-            Topic::Transaction(Transaction::ByAddress(transaction)).to_string()
+            String::from(Topic::Transaction(Transaction::ByAddress(transaction)))
         );
     } else {
         panic!("wrong transaction")
@@ -389,7 +386,7 @@ fn transaction_topic_test() {
         assert_eq!(transaction.address, "some_other_address".to_string());
         assert_eq!(
             "topic://transactions?type=issue&address=some_other_address".to_string(),
-            Topic::Transaction(Transaction::ByAddress(transaction)).to_string()
+            String::from(Topic::Transaction(Transaction::ByAddress(transaction)))
         );
     }
     let url = Url::parse("topic://transactions").unwrap();
@@ -406,7 +403,7 @@ fn transaction_topic_test() {
         assert_eq!(transaction.price_asset, "qwe".to_string());
         assert_eq!(
             "topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe".to_string(),
-            Topic::Transaction(Transaction::Exchange(transaction)).to_string()
+            String::from(Topic::Transaction(Transaction::Exchange(transaction)))
         );
     } else {
         panic!("wrong exchange transaction")
@@ -499,9 +496,9 @@ pub struct LeasingBalance {
     pub address: String,
 }
 
-impl ToString for LeasingBalance {
-    fn to_string(&self) -> String {
-        "leasing_balance/".to_string() + self.address.as_str()
+impl From<LeasingBalance> for String {
+    fn from(v: LeasingBalance) -> String {
+        "leasing_balance/".to_string() + v.address.as_str()
     }
 }
 
@@ -537,7 +534,7 @@ fn leasing_balance_test() {
     let url = Url::parse("topic://leasing_balance/some_address/some_other_part_of_path").unwrap();
     let leasing_balance = LeasingBalance::try_from(url).unwrap();
     assert_eq!(leasing_balance.address, "some_address".to_string());
-    let leasing_balance_string = leasing_balance.to_string();
+    let leasing_balance_string: String = leasing_balance.into();
     assert_eq!(
         "leasing_balance/some_address".to_string(),
         leasing_balance_string
