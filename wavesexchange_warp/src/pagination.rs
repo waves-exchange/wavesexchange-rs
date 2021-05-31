@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PageInfo {
     pub has_next_page: bool,
     pub last_cursor: Option<String>,
@@ -52,10 +52,7 @@ mod tests {
 
     #[test]
     fn empty_data_serialization() {
-        let page_info = PageInfo {
-            has_next_page: false,
-            last_cursor: None,
-        };
+        let page_info = PageInfo::default();
 
         let items: Vec<Foo> = vec![];
 
