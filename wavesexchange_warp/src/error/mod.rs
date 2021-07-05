@@ -8,8 +8,7 @@ pub use response::{Error, Response};
 use futures::future::Ready;
 use std::{convert::Infallible, sync::Arc};
 use warp::{
-    reject::InvalidHeader,
-    reject::{MissingHeader, Reject},
+    reject::{InvalidHeader, MissingHeader, Reject},
     Rejection, Reply,
 };
 
@@ -44,4 +43,22 @@ pub fn handler<E: Reject>(
 
         futures::future::ok(resp.into_response())
     }
+}
+
+pub fn error_handler_with_serde_qs<'a>(
+    error_code_prefix: u16,
+    error_handler: impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>>
+        + Clone
+        + 'a,
+) -> Box<dyn Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>> + 'a>
+{
+    Box::new(move |rej: Rejection| {
+        if let Some(_err) = rej.find::<serde_qs::Error>() {
+            futures::future::ready(Ok(
+                validation::invalid_parameter(error_code_prefix).into_response()
+            ))
+        } else {
+            error_handler(rej)
+        }
+    })
 }
