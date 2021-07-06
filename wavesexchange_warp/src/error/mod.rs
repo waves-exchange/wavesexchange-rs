@@ -12,8 +12,6 @@ use warp::{
     Rejection, Reply,
 };
 
-use crate::query::QueryStringDeserializationError;
-
 pub fn handler<E: Reject>(
     error_code_prefix: u16,
     handle: impl Fn(&E) -> Response,
@@ -25,10 +23,14 @@ pub fn handler<E: Reject>(
 
         if r.is_not_found() {
             resp = not_found(error_code_prefix.clone());
+        } else if let Some(_) = r.find::<warp::reject::MethodNotAllowed>() {
+            resp = method_not_allowed(error_code_prefix.clone());
+        } else if let Some(_) = r.find::<warp::reject::UnsupportedMediaType>() {
+            resp = unsuported_media_type(error_code_prefix.clone());
+        } else if let Some(e) = r.find::<warp::reject::InvalidQuery>() {
+            resp = validation::query_deserialization(error_code_prefix.clone(), Some(e.to_string()));
         } else if let Some(e) = r.find::<warp::filters::body::BodyDeserializeError>() {
             resp = validation::body_deserialization(error_code_prefix.clone(), Some(e.to_string()));
-        } else if let Some(e) = r.find::<QueryStringDeserializationError>() {
-            resp = validation::invalid_parameter(error_code_prefix.clone(), e.0.to_string());
         } else if let Some(e) = r.find::<InvalidHeader>() {
             resp = validation::invalid_header(error_code_prefix.clone(), e.name());
         } else if let Some(e) = r.find::<MissingHeader>() {
@@ -43,16 +45,19 @@ pub fn handler<E: Reject>(
     }
 }
 
-pub fn error_handler_with_serde_qs<'a>(
+pub fn error_handler_with_serde_qs(
     error_code_prefix: u16,
-    error_handler: impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>>
-        + 'a,
-) -> impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>> + 'a {
+    error_handler: impl Fn(
+        Rejection,
+    ) -> futures::future::Ready<Result<warp::reply::Response, Infallible>>,
+) -> impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>> {
     move |rej: Rejection| {
         if let Some(err) = rej.find::<serde_qs::Error>() {
-            futures::future::ready(Ok(
-                validation::invalid_parameter(error_code_prefix, err.to_string()).into_response()
-            ))
+            futures::future::ready(Ok(validation::query_deserialization(
+                error_code_prefix,
+                Some(err.to_string()),
+            )
+            .into_response()))
         } else {
             error_handler(rej)
         }
