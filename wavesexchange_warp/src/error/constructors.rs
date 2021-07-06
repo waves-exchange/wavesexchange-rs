@@ -9,6 +9,8 @@ mod offsets {
     pub const NOT_FOUND: u32 = 4;
     pub const INTERNAL: u32 = 5;
     pub const TIMEOUT: u32 = 6;
+    pub const METHOD_NOT_ALLOWED: u32 = 7;
+    pub const UNSUPPORTED_MEDIA_TYPE: u32 = 8;
 }
 
 pub fn authentication(code_prefix: u16) -> Response {
@@ -25,6 +27,24 @@ pub fn authorization(code_prefix: u16) -> Response {
         StatusCode::FORBIDDEN,
         "Permission denied.",
         code_prefix as u32 * 10000 + offsets::AUTHORIZATION * 100,
+        None,
+    )
+}
+
+pub fn method_not_allowed(code_prefix: u16) -> Response {
+    Response::singleton(
+        StatusCode::METHOD_NOT_ALLOWED,
+        "Method Not Allowed.",
+        code_prefix as u32 * 10000 + offsets::METHOD_NOT_ALLOWED * 100,
+        None,
+    )
+}
+
+pub fn unsuported_media_type(code_prefix: u16) -> Response {
+    Response::singleton(
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        "Unsupported Media Type.",
+        code_prefix as u32 * 10000 + offsets::UNSUPPORTED_MEDIA_TYPE * 100,
         None,
     )
 }
@@ -89,6 +109,15 @@ pub mod validation {
             StatusCode::BAD_REQUEST,
             "Body deserialization error.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 4,
+            reason.map(|reason| ErrorDetails::single_item("reason".to_owned(), reason)),
+        )
+    }
+
+    pub fn query_deserialization(code_prefix: u16, reason: Option<impl AsRef<str>>) -> Response {
+        Response::singleton(
+            StatusCode::BAD_REQUEST,
+            "Query deserialization error.",
+            code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 5,
             reason.map(|reason| ErrorDetails::single_item("reason".to_owned(), reason)),
         )
     }
