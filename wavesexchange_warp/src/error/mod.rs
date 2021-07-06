@@ -49,9 +49,9 @@ pub fn error_handler_with_serde_qs<'a>(
         + 'a,
 ) -> impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>> + 'a {
     move |rej: Rejection| {
-        if let Some(_err) = rej.find::<serde_qs::Error>() {
+        if let Some(err) = rej.find::<serde_qs::Error>() {
             futures::future::ready(Ok(
-                validation::invalid_parameter(error_code_prefix).into_response()
+                validation::invalid_parameter(error_code_prefix, err.to_string()).into_response()
             ))
         } else {
             error_handler(rej)
