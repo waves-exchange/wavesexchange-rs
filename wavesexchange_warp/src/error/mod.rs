@@ -25,16 +25,14 @@ pub fn handler<E: Reject>(
 
         if r.is_not_found() {
             resp = not_found(error_code_prefix.clone());
-        } else if let Some(_) = r.find::<warp::filters::body::BodyDeserializeError>() {
-            resp = validation::body_deserialization(error_code_prefix.clone());
-        // todo header name
-        } else if let Some(_) = r.find::<QueryStringDeserializationError>() {
-            // todo proper qs deserialization error
-            resp = validation::invalid_parameter(error_code_prefix.clone());
-        } else if let Some(_) = r.find::<InvalidHeader>() {
-            resp = validation::invalid_header(error_code_prefix.clone());
-        } else if let Some(_) = r.find::<MissingHeader>() {
-            resp = validation::missing_header(error_code_prefix.clone());
+        } else if let Some(e) = r.find::<warp::filters::body::BodyDeserializeError>() {
+            resp = validation::body_deserialization(error_code_prefix.clone(), Some(e.to_string()));
+        } else if let Some(e) = r.find::<QueryStringDeserializationError>() {
+            resp = validation::invalid_parameter(error_code_prefix.clone(), e.0.to_string());
+        } else if let Some(e) = r.find::<InvalidHeader>() {
+            resp = validation::invalid_header(error_code_prefix.clone(), e.name());
+        } else if let Some(e) = r.find::<MissingHeader>() {
+            resp = validation::missing_header(error_code_prefix.clone(), e.name());
         } else if let Some(crate_error) = r.find::<E>() {
             resp = handler(crate_error);
         } else {
@@ -51,9 +49,9 @@ pub fn error_handler_with_serde_qs<'a>(
         + 'a,
 ) -> impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>> + 'a {
     move |rej: Rejection| {
-        if let Some(_err) = rej.find::<serde_qs::Error>() {
+        if let Some(err) = rej.find::<serde_qs::Error>() {
             futures::future::ready(Ok(
-                validation::invalid_parameter(error_code_prefix).into_response()
+                validation::invalid_parameter(error_code_prefix, err.to_string()).into_response()
             ))
         } else {
             error_handler(rej)

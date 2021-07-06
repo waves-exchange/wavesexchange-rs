@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use warp::{reject, Filter};
 
 #[derive(Debug)]
-pub struct QueryStringDeserializationError(serde_qs::Error);
+pub struct QueryStringDeserializationError(pub serde_qs::Error);
 
 impl reject::Reject for QueryStringDeserializationError {}
 
