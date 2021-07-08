@@ -70,3 +70,14 @@ macro_rules! error(
         $crate::slog::error!($crate::LOGGER, "{:?}", $($args)*)
     };
 );
+
+#[macro_export]
+macro_rules! crit(
+    ($tag:expr, $($args:tt)*) => {
+        $crate::slog::crit!($crate::LOGGER, $tag, $($args)*)
+    };
+    ($($args:tt)*) => {
+        $crate::slog::crit!($crate::LOGGER, "{:?}", $($args)*)
+    };
+);
+
