@@ -51,74 +51,76 @@ pub fn unsuported_media_type(code_prefix: u16) -> Response {
 
 // todo validation errors after error details are implemented
 pub mod validation {
+    use std::collections::HashMap;
+
     use crate::error::response::ErrorDetails;
 
     use super::{offsets, Response};
     use warp::http::StatusCode;
 
-    pub fn missing_parameter(code_prefix: u16, parameter_name: impl AsRef<str>) -> Response {
+    pub fn missing_parameter(
+        code_prefix: u16,
+        details: Option<HashMap<String, String>>,
+    ) -> Response {
         Response::singleton(
             StatusCode::BAD_REQUEST,
             "Missing required parameter.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100,
-            Some(ErrorDetails::single_item(
-                "parameter_name".to_owned(),
-                parameter_name,
-            )),
+            details.map(|details| ErrorDetails::from(details)),
         )
     }
 
-    pub fn invalid_parameter(code_prefix: u16, parameter_name: impl AsRef<str>) -> Response {
+    pub fn invalid_parameter(
+        code_prefix: u16,
+        details: Option<HashMap<String, String>>,
+    ) -> Response {
         Response::singleton(
             StatusCode::BAD_REQUEST,
             "Invalid parameter value.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 1,
-            Some(ErrorDetails::single_item(
-                "parameter_name".to_owned(),
-                parameter_name,
-            )),
+            details.map(|details| ErrorDetails::from(details)),
         )
     }
 
-    pub fn missing_header(code_prefix: u16, header_name: impl AsRef<str>) -> Response {
+    pub fn missing_header(code_prefix: u16, details: Option<HashMap<String, String>>) -> Response {
         Response::singleton(
             StatusCode::BAD_REQUEST,
             "Missing required header.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 2,
-            Some(ErrorDetails::single_item(
-                "header_name".to_owned(),
-                header_name,
-            )),
+            details.map(|details| ErrorDetails::from(details)),
         )
     }
 
-    pub fn invalid_header(code_prefix: u16, header_name: impl AsRef<str>) -> Response {
+    pub fn invalid_header(code_prefix: u16, details: Option<HashMap<String, String>>) -> Response {
         Response::singleton(
             StatusCode::BAD_REQUEST,
             "Invalid header value.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 3,
-            Some(ErrorDetails::single_item(
-                "header_name".to_owned(),
-                header_name,
-            )),
+            details.map(|details| ErrorDetails::from(details)),
         )
     }
 
-    pub fn body_deserialization(code_prefix: u16, reason: Option<impl AsRef<str>>) -> Response {
+    pub fn body_deserialization(
+        code_prefix: u16,
+        details: Option<HashMap<String, String>>,
+    ) -> Response {
         Response::singleton(
             StatusCode::BAD_REQUEST,
             "Body deserialization error.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 4,
-            reason.map(|reason| ErrorDetails::single_item("reason".to_owned(), reason)),
+            details.map(|details| ErrorDetails::from(details)),
         )
     }
 
-    pub fn query_deserialization(code_prefix: u16, reason: Option<impl AsRef<str>>) -> Response {
+    pub fn query_deserialization(
+        code_prefix: u16,
+        details: Option<HashMap<String, String>>,
+    ) -> Response {
         Response::singleton(
             StatusCode::BAD_REQUEST,
             "Query deserialization error.",
             code_prefix as u32 * 10000 + offsets::VALIDATION * 100 + 5,
-            reason.map(|reason| ErrorDetails::single_item("reason".to_owned(), reason)),
+            details.map(|details| ErrorDetails::from(details)),
         )
     }
 }

@@ -7,20 +7,25 @@ use warp::{
 };
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ErrorDetails(Vec<HashMap<String, String>>);
+pub struct ErrorDetails(HashMap<String, String>);
 
 impl ErrorDetails {
     pub fn single_item(key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         let mut hm = HashMap::with_capacity(1);
         hm.insert(key.as_ref().to_owned(), value.as_ref().to_owned());
-        Self(vec![hm])
+        Self(hm)
     }
 
     pub fn add_item(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         let mut hm = HashMap::with_capacity(1);
         hm.insert(key.as_ref().to_owned(), value.as_ref().to_owned());
-        self.0.push(hm);
-        self.to_owned()
+        Self(hm)
+    }
+}
+
+impl From<HashMap<String, String>> for ErrorDetails {
+    fn from(hm: HashMap<String, String>) -> Self {
+        Self(hm)
     }
 }
 
@@ -96,11 +101,11 @@ mod tests {
             StatusCode::BAD_REQUEST,
             "Bad Request",
             1,
-            Some(ErrorDetails(vec![details])),
+            Some(ErrorDetails(details)),
         )
         .into_response();
 
         assert_eq!(res.status(), StatusCode::BAD_REQUEST);
-        assert_eq!(format!("{:?}", res.body()), "Body(Full(b\"{\\\"errors\\\":[{\\\"message\\\":\\\"Bad Request\\\",\\\"code\\\":1,\\\"details\\\":[{\\\"parameter_name\\\":\\\"key\\\"}]}]}\"))");
+        assert_eq!(format!("{:?}", res.body()), "Body(Full(b\"{\\\"errors\\\":[{\\\"message\\\":\\\"Bad Request\\\",\\\"code\\\":1,\\\"details\\\":{\\\"parameter_name\\\":\\\"key\\\"}}]}\"))");
     }
 }
