@@ -6,7 +6,7 @@ pub use constructors::*;
 pub use response::{Error, Response};
 
 use futures::future::Ready;
-use std::{convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use warp::{
     reject::{InvalidHeader, MissingHeader, Reject},
     Rejection, Reply,
@@ -28,13 +28,21 @@ pub fn handler<E: Reject>(
         } else if let Some(_) = r.find::<warp::reject::UnsupportedMediaType>() {
             resp = unsuported_media_type(error_code_prefix.clone());
         } else if let Some(e) = r.find::<warp::reject::InvalidQuery>() {
-            resp = validation::query_deserialization(error_code_prefix.clone(), Some(e.to_string()));
+            let mut details = HashMap::with_capacity(1);
+            details.insert("reason".to_string(), e.to_string());
+            resp = validation::query_deserialization(error_code_prefix.clone(), Some(details));
         } else if let Some(e) = r.find::<warp::filters::body::BodyDeserializeError>() {
-            resp = validation::body_deserialization(error_code_prefix.clone(), Some(e.to_string()));
+            let mut details = HashMap::with_capacity(1);
+            details.insert("reason".to_string(), e.to_string());
+            resp = validation::body_deserialization(error_code_prefix.clone(), Some(details));
         } else if let Some(e) = r.find::<InvalidHeader>() {
-            resp = validation::invalid_header(error_code_prefix.clone(), e.name());
+            let mut details = HashMap::with_capacity(1);
+            details.insert("header_name".to_string(), e.name().to_string());
+            resp = validation::invalid_header(error_code_prefix.clone(), Some(details));
         } else if let Some(e) = r.find::<MissingHeader>() {
-            resp = validation::missing_header(error_code_prefix.clone(), e.name());
+            let mut details = HashMap::with_capacity(1);
+            details.insert("header_name".to_string(), e.name().to_string());
+            resp = validation::missing_header(error_code_prefix.clone(), Some(details));
         } else if let Some(crate_error) = r.find::<E>() {
             resp = handler(crate_error);
         } else {
@@ -53,9 +61,11 @@ pub fn error_handler_with_serde_qs(
 ) -> impl Fn(Rejection) -> futures::future::Ready<Result<warp::reply::Response, Infallible>> {
     move |rej: Rejection| {
         if let Some(err) = rej.find::<serde_qs::Error>() {
+            let mut details = HashMap::with_capacity(1);
+            details.insert("reason".to_string(), err.to_string());
             futures::future::ready(Ok(validation::query_deserialization(
                 error_code_prefix,
-                Some(err.to_string()),
+                Some(details),
             )
             .into_response()))
         } else {
