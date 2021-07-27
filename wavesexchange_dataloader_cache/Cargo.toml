@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 dataloader = { version="0.14", default-features=false, features=["runtime-tokio"] }
 ttl_cache = "0.5"
+
+[dev-dependencies]
+tokio = { version="1", features=["macros"] }

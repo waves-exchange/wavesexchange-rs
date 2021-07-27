@@ -1,21 +1,22 @@
 use std::{hash::Hash, time::Duration};
+use dataloader::cached::Cache;
 use ttl_cache::TtlCache;
 
-pub struct SizedTtlCache<K: Eq + Hash, V> {
+pub struct TtlFIFOCache<K: Eq + Hash, V> {
     cache: TtlCache<K, V>,
     ttl: Duration,
 }
 
-impl<K: Eq + Hash, V> SizedTtlCache<K, V> {
-    pub fn new(size: usize, ttl: Duration) -> Self {
+impl<K: Eq + Hash, V> TtlFIFOCache<K, V> {
+    pub fn new(ttl: Duration, capacity: usize) -> Self {
         Self {
-            cache: TtlCache::new(size),
+            cache: TtlCache::new(capacity),
             ttl,
         }
     }
 }
 
-impl<K: Eq + Hash, V> dataloader::cached::Cache for SizedTtlCache<K, V> {
+impl<K: Eq + Hash, V> Cache for TtlFIFOCache<K, V> {
     type Key = K;
     type Val = V;
 
