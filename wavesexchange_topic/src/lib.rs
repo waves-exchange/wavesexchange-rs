@@ -19,6 +19,7 @@ fn topic_convert_test() {
     let urls = [
         "topic://config/some/path",
         "topic://state/address/key",
+        "topic://state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern2",
         "topic://test_resource/some/path?and_query=true",
         "topic://blockchain_height",
         "topic://transactions?type=all&address=some_address",
@@ -29,6 +30,46 @@ fn topic_convert_test() {
         let topic = Topic::try_from(*s).unwrap();
         let other_s: String = topic.into();
         assert_eq!(*s, other_s);
+    }
+}
+
+impl Topic {
+    /// Whether this topic can be expanded to a set of other topics.
+    pub fn is_multi_topic(&self) -> bool {
+        match self {
+            Topic::State(State::MultiPatterns(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+#[test]
+fn topic_wildcard_test() {
+    let test_cases = [
+        ("topic://config/some/path", false),
+        ("topic://state/address/key", false),
+        ("topic://state?addresses=address&key_patterns=key", true),
+        (
+            "topic://state?addresses=a1%2Ca2&key_patterns=p1%2Cpattern2",
+            true,
+        ),
+        ("topic://test_resource/some/path?and_query=true", false),
+        ("topic://blockchain_height", false),
+        ("topic://transactions?type=all&address=some_address", false),
+        (
+            "topic://transactions?type=exchange&amount_asset=a&price_asset=p",
+            false,
+        ),
+        ("topic://leasing_balance/some_address", false),
+    ];
+    for (topic_url, expected_result) in test_cases {
+        let topic = Topic::try_from(topic_url).unwrap();
+        assert_eq!(
+            topic.is_multi_topic(),
+            expected_result,
+            "Failed: {}",
+            topic_url
+        );
     }
 }
 
@@ -137,18 +178,75 @@ impl From<ConfigParameters> for Topic {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct State {
+pub enum State {
+    Single(StateSingle),
+    MultiPatterns(StateMultiPatterns),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct StateSingle {
     pub address: String,
     pub key: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct StateMultiPatterns {
+    pub addresses: Vec<String>,
+    pub key_patterns: Vec<String>,
+}
+
 impl From<State> for String {
     fn from(v: State) -> String {
+        match v {
+            State::Single(single) => single.into(),
+            State::MultiPatterns(multi) => multi.into(),
+        }
+    }
+}
+
+impl From<StateSingle> for String {
+    fn from(v: StateSingle) -> String {
         format!("state/{}/{}", v.address, v.key)
     }
 }
 
+impl From<StateMultiPatterns> for String {
+    fn from(v: StateMultiPatterns) -> String {
+        // `Self` struct has public fields, and therefore can be constructed with arbitrary values.
+        // This is the last resort check to make sure that resulting string will not be incorrect.
+        assert!(v.addresses.iter().all(|addr| !addr.contains(',')));
+        assert!(v.key_patterns.iter().all(|addr| !addr.contains(',')));
+
+        let addresses = v.addresses.join(",");
+        let key_patterns = v.key_patterns.join(",");
+
+        // Interestingly, this URL encoder does not replace '*' with '%2A' as per RFC-3986:
+        // https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
+        // Only ',' is replaced with '%2C' as expected.
+        // Though, it does not introduce any ambiguities or errors, so we're fine here.
+        use url::form_urlencoded::Serializer;
+        let s = "state?".to_string();
+        let start_pos = s.len();
+        Serializer::for_suffix(s, start_pos)
+            .append_pair("addresses", &addresses)
+            .append_pair("key_patterns", &key_patterns)
+            .finish()
+    }
+}
+
 impl TryFrom<Url> for State {
+    type Error = Error;
+
+    fn try_from(value: Url) -> Result<Self, Self::Error> {
+        Ok(if value.query().is_none() {
+            Self::Single(StateSingle::try_from(value)?)
+        } else {
+            Self::MultiPatterns(StateMultiPatterns::try_from(value)?)
+        })
+    }
+}
+
+impl TryFrom<Url> for StateSingle {
     type Error = Error;
 
     fn try_from(value: Url) -> Result<Self, Self::Error> {
@@ -167,9 +265,38 @@ impl TryFrom<Url> for State {
     }
 }
 
+impl TryFrom<Url> for StateMultiPatterns {
+    type Error = Error;
+
+    fn try_from(value: Url) -> Result<Self, Self::Error> {
+        let get_value_from_query =
+            |url, key| query_utils::get(url, key).map_err(|e| Error::InvalidStateQuery(e));
+        let addresses = get_value_from_query(&value, "addresses")?;
+        let key_patterns = get_value_from_query(&value, "key_patterns")?;
+        let addresses = addresses.split(',').map(ToOwned::to_owned).collect();
+        let key_patterns = key_patterns.split(',').map(ToOwned::to_owned).collect();
+        Ok(Self {
+            addresses,
+            key_patterns,
+        })
+    }
+}
+
 impl From<State> for Topic {
     fn from(v: State) -> Self {
         Self::State(v)
+    }
+}
+
+impl From<StateSingle> for Topic {
+    fn from(v: StateSingle) -> Self {
+        Self::State(State::Single(v))
+    }
+}
+
+impl From<StateMultiPatterns> for Topic {
+    fn from(v: StateMultiPatterns) -> Self {
+        Self::State(State::MultiPatterns(v))
     }
 }
 
@@ -177,14 +304,52 @@ impl From<State> for Topic {
 fn topic_state_test() {
     let url = Url::parse("topic://state/some_address/some_key").unwrap();
     let state = State::try_from(url).unwrap();
-    assert_eq!(state.address, "some_address".to_string());
-    assert_eq!(state.key, "some_key".to_string());
+    assert!(matches!(state, State::Single(_)));
+    if let State::Single(ref state) = state {
+        assert_eq!(state.address, "some_address".to_string());
+        assert_eq!(state.key, "some_key".to_string());
+    }
+
     let url = Url::parse("topic://state/some_address/some_key/some_other_part_of_path").unwrap();
     let state = State::try_from(url).unwrap();
-    assert_eq!(state.address, "some_address".to_string());
-    assert_eq!(state.key, "some_key".to_string());
+    assert!(matches!(state, State::Single(_)));
+    if let State::Single(ref state) = state {
+        assert_eq!(state.address, "some_address".to_string());
+        assert_eq!(state.key, "some_key".to_string());
+    }
     let state_string: String = state.into();
     assert_eq!("state/some_address/some_key".to_string(), state_string);
+
+    // URL with plain (not percent-encoded) chars ',' and '*' should work
+    let url =
+        Url::parse("topic://state?addresses=addr1,addr2&key_patterns=pattern1,pattern*2").unwrap();
+    let state = State::try_from(url).unwrap();
+    assert!(matches!(state, State::MultiPatterns(_)));
+    if let State::MultiPatterns(ref state) = state {
+        assert_eq!(state.addresses, vec!["addr1", "addr2"]);
+        assert_eq!(state.key_patterns, vec!["pattern1", "pattern*2"]);
+    }
+    let state_string: String = state.into();
+    assert_eq!(
+        "state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern*2".to_string(),
+        state_string
+    );
+
+    // URL with properly percent-encoded chars should also work
+    let url =
+        Url::parse("topic://state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern%2A2")
+            .unwrap();
+    let state = State::try_from(url).unwrap();
+    assert!(matches!(state, State::MultiPatterns(_)));
+    if let State::MultiPatterns(ref state) = state {
+        assert_eq!(state.addresses, vec!["addr1", "addr2"]);
+        assert_eq!(state.key_patterns, vec!["pattern1", "pattern*2"]);
+    }
+    let state_string: String = state.into();
+    assert_eq!(
+        "state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern*2".to_string(),
+        state_string
+    );
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -265,7 +430,7 @@ impl TryFrom<Url> for Transaction {
     type Error = Error;
 
     fn try_from(value: Url) -> Result<Self, Self::Error> {
-        if let Ok(raw_tx_type) = get_value_from_query(&value, "type") {
+        if let Ok(raw_tx_type) = query_utils::get(&value, "type") {
             let tx_type = FromStr::from_str(raw_tx_type.as_str())?;
             match tx_type {
                 TransactionType::Exchange => {
@@ -285,6 +450,8 @@ impl TryFrom<Url> for TransactionByAddress {
     type Error = Error;
 
     fn try_from(value: Url) -> Result<Self, Self::Error> {
+        let get_value_from_query =
+            |url, key| query_utils::get(url, key).map_err(|e| Error::InvalidTransactionQuery(e));
         let tx_type = if let Ok(raw_tx_type) = get_value_from_query(&value, "type") {
             FromStr::from_str(raw_tx_type.as_str())?
         } else {
@@ -299,6 +466,8 @@ impl TryFrom<Url> for TransactionExchange {
     type Error = Error;
 
     fn try_from(value: Url) -> Result<Self, Self::Error> {
+        let get_value_from_query =
+            |url, key| query_utils::get(url, key).map_err(|e| Error::InvalidTransactionQuery(e));
         let price_asset = get_value_from_query(&value, "price_asset")?;
         let amount_asset = get_value_from_query(&value, "amount_asset")?;
         Ok(Self {
@@ -306,23 +475,6 @@ impl TryFrom<Url> for TransactionExchange {
             price_asset,
         })
     }
-}
-
-fn get_value_from_query(value: &Url, key: &str) -> Result<String, Error> {
-    value
-        .query_pairs()
-        .find_map(|(k, v)| {
-            if k == key && !v.is_empty() {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| {
-            Error::InvalidTransactionQuery(error::ErrorQuery(
-                value.query().map(ToString::to_string),
-            ))
-        })
 }
 
 impl From<Transaction> for String {
@@ -539,4 +691,22 @@ fn leasing_balance_test() {
         "leasing_balance/some_address".to_string(),
         leasing_balance_string
     );
+}
+
+mod query_utils {
+    use crate::error::ErrorQuery;
+    use url::Url;
+
+    pub(super) fn get(value: &Url, key: &str) -> Result<String, ErrorQuery> {
+        value
+            .query_pairs()
+            .find_map(|(k, v)| {
+                if k == key && !v.is_empty() {
+                    Some(v.to_string())
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| ErrorQuery(value.query().map(ToString::to_string)))
+    }
 }
