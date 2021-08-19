@@ -19,7 +19,7 @@ fn topic_convert_test() {
     let urls = [
         "topic://config/some/path",
         "topic://state/address/key",
-        "topic://state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern2",
+        "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern2",
         "topic://test_resource/some/path?and_query=true",
         "topic://blockchain_height",
         "topic://transactions?type=all&address=some_address",
@@ -48,9 +48,9 @@ fn topic_wildcard_test() {
     let test_cases = [
         ("topic://config/some/path", false),
         ("topic://state/address/key", false),
-        ("topic://state?addresses=address&key_patterns=key", true),
+        ("topic://state?address__in[]=address&key__match_any[]=key", true),
         (
-            "topic://state?addresses=a1%2Ca2&key_patterns=p1%2Cpattern2",
+            "topic://state?address__in[]=a1&address__in[]=a2&key__match_any[]=p1&key__match_any[]=pattern2",
             true,
         ),
         ("topic://test_resource/some/path?and_query=true", false),
@@ -195,6 +195,39 @@ pub struct StateMultiPatterns {
     pub key_patterns: Vec<String>,
 }
 
+mod serde_state {
+    use super::StateMultiPatterns;
+    use serde::{Deserialize, Serialize};
+
+    #[allow(non_snake_case)]
+    #[derive(Deserialize, Serialize)]
+    struct Data {
+        address__in: Vec<String>,
+        key__match_any: Vec<String>,
+    }
+
+    pub(super) fn state_query_encode(v: StateMultiPatterns) -> Result<String, ()> {
+        let data = Data {
+            address__in: v.addresses,
+            key__match_any: v.key_patterns,
+        };
+
+        // Interestingly, this URL encoder does not replace '*' with '%2A' as per RFC-3986:
+        // https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
+        // Same is for square brackets, '[' and ']'.
+        // Though, it does not introduce any ambiguities or errors, so we're fine here.
+        serde_qs::to_string(&data).map_err(|_| ())
+    }
+
+    pub(super) fn state_query_decode(s: &str) -> Result<StateMultiPatterns, ()> {
+        let data: Data = serde_qs::from_str(s).map_err(|_| ())?;
+        Ok(StateMultiPatterns {
+            addresses: data.address__in,
+            key_patterns: data.key__match_any,
+        })
+    }
+}
+
 impl From<State> for String {
     fn from(v: State) -> String {
         match v {
@@ -212,25 +245,7 @@ impl From<StateSingle> for String {
 
 impl From<StateMultiPatterns> for String {
     fn from(v: StateMultiPatterns) -> String {
-        // `Self` struct has public fields, and therefore can be constructed with arbitrary values.
-        // This is the last resort check to make sure that resulting string will not be incorrect.
-        assert!(v.addresses.iter().all(|addr| !addr.contains(',')));
-        assert!(v.key_patterns.iter().all(|addr| !addr.contains(',')));
-
-        let addresses = v.addresses.join(",");
-        let key_patterns = v.key_patterns.join(",");
-
-        // Interestingly, this URL encoder does not replace '*' with '%2A' as per RFC-3986:
-        // https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
-        // Only ',' is replaced with '%2C' as expected.
-        // Though, it does not introduce any ambiguities or errors, so we're fine here.
-        use url::form_urlencoded::Serializer;
-        let s = "state?".to_string();
-        let start_pos = s.len();
-        Serializer::for_suffix(s, start_pos)
-            .append_pair("addresses", &addresses)
-            .append_pair("key_patterns", &key_patterns)
-            .finish()
+        "state?".to_string() + &serde_state::state_query_encode(v).unwrap()
     }
 }
 
@@ -269,16 +284,12 @@ impl TryFrom<Url> for StateMultiPatterns {
     type Error = Error;
 
     fn try_from(value: Url) -> Result<Self, Self::Error> {
-        let get_value_from_query =
-            |url, key| query_utils::get(url, key).map_err(|e| Error::InvalidStateQuery(e));
-        let addresses = get_value_from_query(&value, "addresses")?;
-        let key_patterns = get_value_from_query(&value, "key_patterns")?;
-        let addresses = addresses.split(',').map(ToOwned::to_owned).collect();
-        let key_patterns = key_patterns.split(',').map(ToOwned::to_owned).collect();
-        Ok(Self {
-            addresses,
-            key_patterns,
-        })
+        use crate::error::ErrorQuery;
+        let query = value
+            .query()
+            .ok_or_else(|| Error::InvalidStateQuery(ErrorQuery(None)))?;
+        serde_state::state_query_decode(query)
+            .map_err(|_| Error::InvalidStateQuery(ErrorQuery(Some(query.to_owned()))))
     }
 }
 
@@ -320,9 +331,9 @@ fn topic_state_test() {
     let state_string: String = state.into();
     assert_eq!("state/some_address/some_key".to_string(), state_string);
 
-    // URL with plain (not percent-encoded) chars ',' and '*' should work
+    // URL with plain (not percent-encoded) character '*' should work
     let url =
-        Url::parse("topic://state?addresses=addr1,addr2&key_patterns=pattern1,pattern*2").unwrap();
+        Url::parse("topic://state?address__in[]=addr1&address__in[]=addr2&key__match_any[]=pattern1&key__match_any[]=pattern*2").unwrap();
     let state = State::try_from(url).unwrap();
     assert!(matches!(state, State::MultiPatterns(_)));
     if let State::MultiPatterns(ref state) = state {
@@ -331,13 +342,13 @@ fn topic_state_test() {
     }
     let state_string: String = state.into();
     assert_eq!(
-        "state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern*2".to_string(),
+        "state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
         state_string
     );
 
     // URL with properly percent-encoded chars should also work
     let url =
-        Url::parse("topic://state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern%2A2")
+        Url::parse("topic://state?address__in[]=addr1&address__in[]=addr2&key__match_any[]=pattern1&key__match_any[]=pattern%2A2")
             .unwrap();
     let state = State::try_from(url).unwrap();
     assert!(matches!(state, State::MultiPatterns(_)));
@@ -347,7 +358,7 @@ fn topic_state_test() {
     }
     let state_string: String = state.into();
     assert_eq!(
-        "state?addresses=addr1%2Caddr2&key_patterns=pattern1%2Cpattern*2".to_string(),
+        "state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
         state_string
     );
 }
