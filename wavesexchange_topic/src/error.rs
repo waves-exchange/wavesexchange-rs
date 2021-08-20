@@ -2,6 +2,8 @@
 pub enum Error {
     #[error("InvalidStatePath: {0}")]
     InvalidStatePath(String),
+    #[error("InvalidStateQuery: {0}")]
+    InvalidStateQuery(ErrorQuery),
     #[error("UrlParseError: {0}")]
     UrlParseError(#[from] url::ParseError),
     #[error("InvalidTopic: {0}")]
