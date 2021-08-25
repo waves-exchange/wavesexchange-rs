@@ -228,6 +228,21 @@ mod serde_state {
     }
 }
 
+mod url_escape {
+    use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+    use std::borrow::Cow;
+
+    const ENCODABLE_SET: AsciiSet = NON_ALPHANUMERIC.remove(b'_');
+
+    pub(super) fn encode(s: &str) -> Cow<str> {
+        utf8_percent_encode(s, &ENCODABLE_SET).into()
+    }
+
+    pub(super) fn decode(s: &str) -> Cow<str> {
+        percent_decode_str(s).decode_utf8_lossy()
+    }
+}
+
 impl From<State> for String {
     fn from(v: State) -> String {
         match v {
@@ -239,7 +254,9 @@ impl From<State> for String {
 
 impl From<StateSingle> for String {
     fn from(v: StateSingle) -> String {
-        format!("state/{}/{}", v.address, v.key)
+        let address = url_escape::encode(&v.address);
+        let key = url_escape::encode(&v.key);
+        format!("state/{}/{}", address, key)
     }
 }
 
@@ -271,8 +288,8 @@ impl TryFrom<Url> for StateSingle {
             .take(2)
             .collect::<Vec<_>>();
         if params.len() == 2 {
-            let address = params[0].to_string();
-            let key = params[1].to_string();
+            let address = url_escape::decode(params[0]).into_owned();
+            let key = url_escape::decode(params[1]).into_owned();
             Ok(Self { address, key })
         } else {
             Err(Error::InvalidStatePath(value.path().to_string()))
