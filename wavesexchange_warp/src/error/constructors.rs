@@ -135,7 +135,7 @@ pub fn not_implemented(code_prefix: u16) -> Response {
     )
 }
 
-pub fn requests_limit(code_prefix: u16) -> Response {
+pub fn requests_limit_exceeded(code_prefix: u16) -> Response {
     Response::singleton(
         StatusCode::TOO_MANY_REQUESTS,
         "Requests limit exceeded.",
