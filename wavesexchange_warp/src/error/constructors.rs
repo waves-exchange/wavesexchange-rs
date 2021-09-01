@@ -11,7 +11,7 @@ mod offsets {
     pub const TIMEOUT: u32 = 6;
     pub const METHOD_NOT_ALLOWED: u32 = 7;
     pub const UNSUPPORTED_MEDIA_TYPE: u32 = 8;
-    pub const RESOURCE: u32 = 9;
+    pub const LIMITS: u32 = 9;
 }
 
 pub fn authentication(code_prefix: u16) -> Response {
@@ -138,8 +138,8 @@ pub fn not_implemented(code_prefix: u16) -> Response {
 pub fn requests_limit(code_prefix: u16) -> Response {
     Response::singleton(
         StatusCode::TOO_MANY_REQUESTS,
-        "Requests limit reached.",
-        code_prefix as u32 * 10000 + offsets::RESOURCE * 100,
+        "Requests limit exceeded.",
+        code_prefix as u32 * 10000 + offsets::LIMITS * 100,
         None,
     )
 }
