@@ -33,6 +33,9 @@ fn init_logger() -> Logger {
 
 #[macro_export]
 macro_rules! trace(
+    ($arg:literal) => {
+        $crate::slog::trace!($crate::LOGGER, "{}", $arg)
+    };
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::trace!($crate::LOGGER, $tag, $($args)*)
     };
@@ -43,6 +46,9 @@ macro_rules! trace(
 
 #[macro_export]
 macro_rules! debug(
+    ($arg:literal) => {
+        $crate::slog::debug!($crate::LOGGER, "{}", $arg)
+    };
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::debug!($crate::LOGGER, $tag, $($args)*)
     };
@@ -53,16 +59,22 @@ macro_rules! debug(
 
 #[macro_export]
 macro_rules! info(
+    ($arg:literal) => {
+        $crate::slog::info!($crate::LOGGER, "{}", $arg)
+    };
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::info!($crate::LOGGER, $tag, $($args)*)
     };
     ($($args:tt)*) => {
         $crate::slog::info!($crate::LOGGER, "{:?}", $($args)*)
-    }
+    };
 );
 
 #[macro_export]
 macro_rules! warn(
+    ($arg:literal) => {
+        $crate::slog::warn!($crate::LOGGER, "{}", $arg)
+    };
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::warn!($crate::LOGGER, $tag, $($args)*)
     };
@@ -73,6 +85,9 @@ macro_rules! warn(
 
 #[macro_export]
 macro_rules! error(
+    ($arg:literal) => {
+        $crate::slog::error!($crate::LOGGER, "{}", $arg)
+    };
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::error!($crate::LOGGER, $tag, $($args)*)
     };
@@ -83,6 +98,9 @@ macro_rules! error(
 
 #[macro_export]
 macro_rules! crit(
+    ($arg:literal) => {
+        $crate::slog::crit!($crate::LOGGER, "{}", $arg)
+    };
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::crit!($crate::LOGGER, $tag, $($args)*)
     };
