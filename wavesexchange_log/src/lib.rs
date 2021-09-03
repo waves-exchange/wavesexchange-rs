@@ -32,6 +32,16 @@ fn init_logger() -> Logger {
 }
 
 #[macro_export]
+macro_rules! trace(
+    ($tag:expr, $($args:tt)*) => {
+        $crate::slog::trace!($crate::LOGGER, $tag, $($args)*)
+    };
+    ($($args:tt)*) => {
+        $crate::slog::trace!($crate::LOGGER, "{:?}", $($args)*)
+    };
+);
+
+#[macro_export]
 macro_rules! debug(
     ($tag:expr, $($args:tt)*) => {
         $crate::slog::debug!($crate::LOGGER, $tag, $($args)*)
