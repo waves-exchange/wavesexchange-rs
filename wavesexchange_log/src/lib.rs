@@ -122,6 +122,128 @@ macro_rules! crit(
     };
 );
 
+/// Use this macro to set up a scope timer,
+/// which logs execution time of a code block.
+///
+/// ```no_run
+/// # use wavesexchange_log::timer;
+/// {
+///     timer!("this is a test code block");
+///     // Some computations goes here
+/// } // At the end of the scope the execution time is logged.
+/// ```
+///
+/// When not specified, logging level `debug` is used by default,
+/// as in the example above.
+///
+/// Logging level can be set explicitly, either `trace`, `debug` or `info`:
+/// ```no_run
+/// # use wavesexchange_log::timer;
+/// timer!("this is a test", level = info);
+/// timer!("this is a test", level = debug);
+/// timer!("this is a test", level = trace);
+/// ```
+///
+/// Also, verbose mode can be specified.
+/// In this mode there will be two log records:
+/// one when operation starts, and the second when it finishes.
+///
+/// ```no_run
+/// # use wavesexchange_log::timer;
+/// {
+///     timer!("this is a test code block", verbose);
+///     // Some computations goes here
+/// } // At the end of the scope the execution time is logged.
+/// ```
+///
+/// If logging level is not specified, `trace` will be used by default
+/// for verbose mode.
+///
+/// If both logging level and verbose mode are set,
+/// the logging level must come first:
+///
+/// ```no_run
+/// # use wavesexchange_log::timer;
+/// timer!("this is a test", level = info, verbose);
+/// timer!("this is a test", level = debug, verbose);
+/// timer!("this is a test", level = trace, verbose);
+/// ```
+#[macro_export]
+macro_rules! timer {
+    ($name:literal) => {
+        $crate::timer!($name, level = debug)
+    };
+    ($name:literal, verbose) => {
+        $crate::timer!($name, level = trace, verbose)
+    };
+    ($name:literal, level = trace) => {
+        $crate::timer!(@ $name, $crate::slog::Level::Trace, false)
+    };
+    ($name:literal, level = debug) => {
+        $crate::timer!(@ $name, $crate::slog::Level::Debug, false)
+    };
+    ($name:literal, level = info) => {
+        $crate::timer!(@ $name, $crate::slog::Level::Info, false)
+    };
+    ($name:literal, level = trace, verbose) => {
+        $crate::timer!(@ $name, $crate::slog::Level::Trace, true)
+    };
+    ($name:literal, level = debug, verbose) => {
+        $crate::timer!(@ $name, $crate::slog::Level::Debug, true)
+    };
+    ($name:literal, level = info, verbose) => {
+        $crate::timer!(@ $name, $crate::slog::Level::Info, true)
+    };
+    (@ $name:literal, $level:expr, $verbose:literal) => {
+        let _timer = $crate::scopetimer::ScopeTimer::new($name, $level, $verbose);
+    };
+}
+
+pub mod scopetimer {
+    use slog::Level;
+    use std::{fmt, time};
+
+    pub struct ScopeTimer(&'static str, Level, bool, time::Instant);
+
+    impl ScopeTimer {
+        #[inline(always)]
+        pub fn new(name: &'static str, level: Level, verbose: bool) -> Self {
+            if verbose {
+                print(level, format_args!("BEGIN {}", name));
+            }
+            ScopeTimer(name, level, verbose, time::Instant::now())
+        }
+    }
+
+    impl Drop for ScopeTimer {
+        #[inline(always)]
+        fn drop(&mut self) {
+            let &mut ScopeTimer(name, level, verbose, ref started) = self;
+            let elapsed = started.elapsed();
+            const MS_IN_SEC: f64 = 1_000.0;
+            let elapsed_ms = elapsed.as_secs_f64() * MS_IN_SEC;
+            if verbose {
+                print(
+                    level,
+                    format_args!("END   {}: elapsed {}ms", name, elapsed_ms),
+                );
+            } else {
+                print(level, format_args!("{}: completed in {}ms", name, elapsed_ms));
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn print(level: Level, msg: fmt::Arguments) {
+        match level {
+            Level::Trace => super::trace!("{}", msg),
+            Level::Debug => super::debug!("{}", msg),
+            Level::Info => super::info!("{}", msg),
+            _ => panic!("Bad log level for scope timer"),
+        }
+    }
+}
+
 mod format {
     use std::env;
 
