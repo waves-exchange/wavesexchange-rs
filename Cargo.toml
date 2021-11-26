@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "wavesexchange_address",
     "wavesexchange_log",
     "wavesexchange_warp",
     "wavesexchange_topic",
