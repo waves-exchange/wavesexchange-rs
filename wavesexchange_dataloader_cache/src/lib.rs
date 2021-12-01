@@ -37,6 +37,7 @@ where
 {
     cache: C,
     cache_strategy: SF,
+    cache_strategy_filtered_keys: Vec<K>,
     _pd: (PhantomData<K>, PhantomData<V>),
 }
 
@@ -55,9 +56,10 @@ where
     }
 
     fn insert(&mut self, key: Self::Key, val: Self::Val) {
-        if (self.cache_strategy)(&key, &val) {
-            self.cache.cache_set(key, val);
+        if !(self.cache_strategy)(&key, &val) {
+            self.cache_strategy_filtered_keys.push(key.clone());
         }
+        self.cache.cache_set(key, val);
     }
 
     fn remove(&mut self, key: &Self::Key) -> Option<Self::Val> {
@@ -80,6 +82,7 @@ where
         Cacher {
             cache,
             cache_strategy: strategy_fn,
+            cache_strategy_filtered_keys: Vec::new(),
             _pd: (PhantomData, PhantomData),
         }
     }
@@ -96,6 +99,16 @@ where
                 strategy_fn,
             ))));
         entry.clone()
+    }
+
+    fn cleanup(&mut self) {
+        let keys_to_remove = self
+            .cache_strategy_filtered_keys
+            .drain(..)
+            .collect::<Vec<K>>();
+        for key in keys_to_remove {
+            (&mut *self).remove(&key).expect("unreachable");
+        }
     }
 }
 
@@ -120,21 +133,24 @@ where
         loader
     }
 
-    /// I.e. cache only Ok(...), but not None
+    /// I.e. cache only Ok(...), but not Err
     #[inline]
     fn cache_strategy(_: &K, _: &V) -> bool {
         true
     }
 
+    /// Like a method in BatchFn
     async fn load_fn(&mut self, keys: &[K]) -> HashMap<K, V>;
 
     /// Don't override this
     async fn load(&self, key: K) -> V {
         let wrapper = BatchFnWrapper(self.clone());
-        let cache = Cacher::get_or_init(|| Self::init_cache(), Self::cache_strategy).await;
+        let cache = Cacher::get_or_init(Self::init_cache, Self::cache_strategy).await;
         let mut cache_lock = cache.lock().await;
         let loader = Loader::with_cache(wrapper, &mut *cache_lock);
-        Self::init_loader(loader).load(key).await
+        let result = Self::init_loader(loader).load(key).await;
+        cache_lock.cleanup();
+        result
     }
 }
 
@@ -158,7 +174,7 @@ mod tests {
     use std::time::{Duration, SystemTime};
     use tokio::time::sleep;
 
-    //upper border, cached values usually are extracted faster
+    //upper border, cached values are usually extracted faster
     const CACHED_DUR: Duration = Duration::from_millis(10);
     const SLEEP_DUR: Duration = Duration::from_secs(1);
 
