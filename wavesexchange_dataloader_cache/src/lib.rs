@@ -15,14 +15,25 @@ use typemap::{ShareCloneMap, TypeMap};
 
 static CACHES: Lazy<Mutex<ShareCloneMap>> = Lazy::new(|| Mutex::new(TypeMap::custom()));
 
+pub trait CacheKey: Eq + Hash + Clone + Debug + Send + Sync + 'static {}
+pub trait CacheVal: Clone + Debug + Send + 'static {}
+pub trait CacheBounds<K: CacheKey, V: CacheVal>: cached::Cached<K, V> + Send + 'static {}
+
+impl<T> CacheKey for T where T: Eq + Hash + Clone + Debug + Send + Sync + 'static {}
+impl<T> CacheVal for T where T: Clone + Debug + Send + 'static {}
+impl<K: CacheKey, V: CacheVal, T> CacheBounds<K, V> for T where
+    T: cached::Cached<K, V> + Send + 'static
+{
+}
+
 #[macro_use]
 extern crate async_trait;
 
 impl<K, V, C, SF> typemap::Key for (K, V, C, SF)
 where
-    K: Eq + Hash + Clone + Debug + Send + Sync + 'static,
-    V: Clone + Send + 'static,
-    C: cached::Cached<K, V> + Send + 'static,
+    K: CacheKey,
+    V: CacheVal,
+    C: CacheBounds<K, V>,
     SF: Fn(&K, &V) -> bool + 'static,
 {
     type Value = Arc<Mutex<Cacher<K, V, C, SF>>>;
@@ -30,9 +41,9 @@ where
 
 pub struct Cacher<K, V, C, SF>
 where
-    K: Eq + Hash + Clone + Debug + Send + Sync,
-    V: Clone + Send,
-    C: cached::Cached<K, V>,
+    K: CacheKey,
+    V: CacheVal,
+    C: CacheBounds<K, V>,
     SF: Fn(&K, &V) -> bool,
 {
     cache: C,
@@ -43,9 +54,9 @@ where
 
 impl<K, V, C, SF> DlCache for &mut Cacher<K, V, C, SF>
 where
-    K: Eq + Hash + Clone + Debug + Send + Sync,
-    V: Clone + Send,
-    C: cached::Cached<K, V>,
+    K: CacheKey,
+    V: CacheVal,
+    C: CacheBounds<K, V>,
     SF: Fn(&K, &V) -> bool,
 {
     type Key = K;
@@ -73,9 +84,9 @@ where
 
 impl<K, V, C, SF> Cacher<K, V, C, SF>
 where
-    K: Eq + Hash + Clone + Debug + Send + Sync + 'static,
-    V: Clone + Send + 'static,
-    C: cached::Cached<K, V> + Send + 'static,
+    K: CacheKey,
+    V: CacheVal,
+    C: CacheBounds<K, V>,
     SF: Fn(&K, &V) -> bool + Send + 'static,
 {
     fn new(cache: C, strategy_fn: SF) -> Cacher<K, V, C, SF> {
@@ -87,8 +98,8 @@ where
         }
     }
 
-    async fn get_or_init<F: FnOnce() -> C>(
-        inner_cache_fn: F,
+    async fn get_or_init(
+        inner_cache_fn: impl FnOnce() -> C,
         strategy_fn: SF,
     ) -> Arc<Mutex<Cacher<K, V, C, SF>>> {
         let mut caches = CACHES.lock().await;
@@ -116,12 +127,12 @@ type LocalLoader<'c, K, V, CL, SF> =
     Loader<K, V, BatchFnWrapper<CL>, &'c mut Cacher<K, V, <CL as CachedLoader<K, V>>::Cache, SF>>;
 
 #[async_trait]
-pub trait CachedLoader<K, V>: Send + Clone + 'static
+pub trait CachedLoader<K, V>: Send + Sync + Clone + 'static
 where
-    K: Eq + Hash + Clone + Debug + Send + Sync + 'static,
-    V: Clone + Send + 'static,
+    K: CacheKey,
+    V: CacheVal,
 {
-    type Cache: cached::Cached<K, V> + Send + 'static;
+    type Cache: CacheBounds<K, V>;
 
     /// Setup cache type
     fn init_cache() -> Self::Cache;
@@ -159,8 +170,8 @@ pub struct BatchFnWrapper<C>(C);
 #[async_trait]
 impl<K, V, C> BatchFn<K, V> for BatchFnWrapper<C>
 where
-    K: Eq + Hash + Clone + Debug + Send + Sync + 'static,
-    V: Clone + Send + 'static,
+    K: CacheKey,
+    V: CacheVal,
     C: CachedLoader<K, V>,
 {
     async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
@@ -175,8 +186,41 @@ mod tests {
     use tokio::time::sleep;
 
     //upper border, cached values are usually extracted faster
-    const CACHED_DUR: Duration = Duration::from_millis(10);
+    const CACHED_DUR: Duration = Duration::from_millis(1);
+    //we assume that loader functions are slow, so we just sleep in them
     const SLEEP_DUR: Duration = Duration::from_secs(1);
+
+    fn is_cached(load_time: Duration) -> bool {
+        load_time < CACHED_DUR
+    }
+
+    fn is_not_cached(load_time: Duration) -> bool {
+        load_time >= SLEEP_DUR
+    }
+
+    async fn measure_load<K: CacheKey, V: CacheVal + Eq, C: CachedLoader<K, V>>(
+        loader: &C,
+        key: K,
+        expected_val: V,
+        measure_fn: impl Fn(Duration) -> bool,
+    ) -> bool {
+        let now = SystemTime::now();
+        let result = loader.load(key.clone()).await;
+        let elapsed = now.elapsed().unwrap();
+        let measurement_is_ok = measure_fn(elapsed);
+        let values_are_eq = result == expected_val;
+        if !measurement_is_ok {
+            println!("Error: measure fn failed!");
+        }
+        if !values_are_eq {
+            println!("Error: expected and loaded values are not equal");
+            println!(
+                "key: {:?}, value: {:?}, expected value: {:?}",
+                key, result, expected_val
+            );
+        }
+        values_are_eq && measurement_is_ok
+    }
 
     #[tokio::test]
     async fn test_timed() {
@@ -189,10 +233,7 @@ mod tests {
 
             async fn load_fn(&mut self, keys: &[u64]) -> HashMap<u64, String> {
                 sleep(SLEEP_DUR).await;
-                HashMap::from_iter(
-                    keys.into_iter()
-                        .map(|k| (*k, format!("your number is {}", k))),
-                )
+                HashMap::from_iter(keys.into_iter().map(|k| (*k, format!("num: {}", k))))
             }
 
             fn init_cache() -> Self::Cache {
@@ -201,22 +242,14 @@ mod tests {
         }
 
         let loader = Loadable {};
-        let now = SystemTime::now();
-        let result = loader.load(4u64).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
-        assert_eq!(result, "your number is 4");
+        assert!(measure_load(&loader, 4, "num: 4".to_string(), is_not_cached).await);
 
         //value is cached
-        let now = SystemTime::now();
-        loader.load(4u64).await;
-        assert!(now.elapsed().unwrap() < CACHED_DUR);
-
+        assert!(measure_load(&loader, 4u64, "num: 4".to_string(), is_cached).await);
         sleep(Duration::from_secs(3)).await;
 
         //value is dropped due to ttl
-        let now = SystemTime::now();
-        loader.load(4u64).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
+        assert!(measure_load(&loader, 4u64, "num: 4".to_string(), is_not_cached).await);
     }
 
     #[tokio::test]
@@ -230,10 +263,7 @@ mod tests {
 
             async fn load_fn(&mut self, keys: &[isize]) -> HashMap<isize, String> {
                 sleep(SLEEP_DUR).await;
-                HashMap::from_iter(
-                    keys.into_iter()
-                        .map(|k| (*k, format!("your signed number is {}", k))),
-                )
+                HashMap::from_iter(keys.into_iter().map(|k| (*k, format!("num: {}", k))))
             }
 
             fn init_cache() -> Self::Cache {
@@ -242,25 +272,32 @@ mod tests {
         }
 
         let loader = Loadable {};
-        let now = SystemTime::now();
-        let result = loader.load(-65535isize).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
-        assert_eq!(result, "your signed number is -65535");
+        assert!(
+            measure_load(
+                &loader,
+                -65535isize,
+                "num: -65535".to_string(),
+                is_not_cached,
+            )
+            .await
+        );
 
         //value is cached
-        let now = SystemTime::now();
-        loader.load(-65535isize).await;
-        assert!(now.elapsed().unwrap() < CACHED_DUR);
+        assert!(measure_load(&loader, -65535isize, "num: -65535".to_string(), is_cached).await);
 
         //rewriting only available cache entry
-        let now = SystemTime::now();
-        loader.load(-4isize).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
+        assert!(measure_load(&loader, -4isize, "num: -4".to_string(), is_not_cached).await);
 
-        //value is dropped because cache size is exceeded
-        let now = SystemTime::now();
-        loader.load(-65535isize).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
+        //first value is dropped because cache size is exceeded
+        assert!(
+            measure_load(
+                &loader,
+                -65535isize,
+                "num: -65535".to_string(),
+                is_not_cached,
+            )
+            .await
+        );
     }
 
     #[tokio::test]
@@ -278,8 +315,8 @@ mod tests {
                     (
                         *k,
                         if k % 2 == 0 {
-                            // returns only even numbers
-                            Some(format!("your signed number is {}", k))
+                            // loader fn returns string only with even numbers
+                            Some(format!("num: {}", k))
                         } else {
                             None
                         },
@@ -298,23 +335,15 @@ mod tests {
 
         //even number
         let loader = Loadable {};
-        let now = SystemTime::now();
-        loader.load(28isize).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
+        assert!(measure_load(&loader, 28isize, Some("num: 28".to_string()), is_not_cached).await);
 
-        //cached
-        let now = SystemTime::now();
-        loader.load(28isize).await;
-        assert!(now.elapsed().unwrap() < CACHED_DUR);
+        //is cached
+        assert!(measure_load(&loader, 28isize, Some("num: 28".to_string()), is_cached).await);
 
         //odd number
-        let now = SystemTime::now();
-        loader.load(5isize).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
+        assert!(measure_load(&loader, 5, None, is_not_cached).await);
 
-        //not cached
-        let now = SystemTime::now();
-        loader.load(5isize).await;
-        assert!(now.elapsed().unwrap() >= SLEEP_DUR);
+        //is not cached
+        assert!(measure_load(&loader, 5, None, is_not_cached).await);
     }
 }
