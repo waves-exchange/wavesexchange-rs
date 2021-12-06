@@ -29,33 +29,18 @@ extern crate async_trait;
 
 struct TyMapKey<T>(PhantomData<T>);
 
-impl<K, V, C> typemap::Key for TyMapKey<(K, V, C)>
-where
-    K: CacheKey,
-    V: CacheVal,
-    C: CacheBounds<K, V>,
-{
+impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> typemap::Key for TyMapKey<(K, V, C)> {
     type Value = Arc<Mutex<Cacher<K, V, C>>>;
 }
 
-pub struct Cacher<K, V, C>
-where
-    K: CacheKey,
-    V: CacheVal,
-    C: CacheBounds<K, V>,
-{
+pub struct Cacher<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> {
     cache: C,
     cache_strategy: Box<dyn Fn(&K, &V) -> bool + Send + 'static>,
     cache_strategy_filtered_keys: Vec<K>,
     _pd: (PhantomData<K>, PhantomData<V>),
 }
 
-impl<K, V, C> DlCache for &mut Cacher<K, V, C>
-where
-    K: CacheKey,
-    V: CacheVal,
-    C: CacheBounds<K, V>,
-{
+impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> DlCache for &mut Cacher<K, V, C> {
     type Key = K;
     type Val = V;
 
@@ -79,12 +64,7 @@ where
     }
 }
 
-impl<K, V, C> Cacher<K, V, C>
-where
-    K: CacheKey,
-    V: CacheVal,
-    C: CacheBounds<K, V>,
-{
+impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> Cacher<K, V, C> {
     fn new(cache: C, strategy_fn: impl Fn(&K, &V) -> bool + Send + 'static) -> Cacher<K, V, C> {
         Cacher {
             cache,
@@ -123,11 +103,7 @@ type LocalLoader<'c, K, V, CL> =
     Loader<K, V, BatchFnWrapper<CL>, &'c mut Cacher<K, V, <CL as CachedLoader<K, V>>::Cache>>;
 
 #[async_trait]
-pub trait CachedLoader<K, V>: Send + Sync + Clone + 'static
-where
-    K: CacheKey,
-    V: CacheVal,
-{
+pub trait CachedLoader<K: CacheKey, V: CacheVal>: Send + Sync + Clone + 'static {
     type Cache: CacheBounds<K, V>;
 
     /// Setup cache type
@@ -162,12 +138,7 @@ where
 pub struct BatchFnWrapper<C>(C);
 
 #[async_trait]
-impl<K, V, C> BatchFn<K, V> for BatchFnWrapper<C>
-where
-    K: CacheKey,
-    V: CacheVal,
-    C: CachedLoader<K, V>,
-{
+impl<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> BatchFn<K, V> for BatchFnWrapper<C> {
     async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
         self.0.load_fn(keys).await
     }
