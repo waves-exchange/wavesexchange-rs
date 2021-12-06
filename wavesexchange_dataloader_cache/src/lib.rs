@@ -29,35 +29,32 @@ extern crate async_trait;
 
 struct TyMapKey<T>(PhantomData<T>);
 
-impl<K, V, C, SF> typemap::Key for TyMapKey<(K, V, C, SF)>
+impl<K, V, C> typemap::Key for TyMapKey<(K, V, C)>
 where
     K: CacheKey,
     V: CacheVal,
     C: CacheBounds<K, V>,
-    SF: Fn(&K, &V) -> bool + 'static,
 {
-    type Value = Arc<Mutex<Cacher<K, V, C, SF>>>;
+    type Value = Arc<Mutex<Cacher<K, V, C>>>;
 }
 
-pub struct Cacher<K, V, C, SF>
+pub struct Cacher<K, V, C>
 where
     K: CacheKey,
     V: CacheVal,
     C: CacheBounds<K, V>,
-    SF: Fn(&K, &V) -> bool,
 {
     cache: C,
-    cache_strategy: SF,
+    cache_strategy: Box<dyn Fn(&K, &V) -> bool + Send + 'static>,
     cache_strategy_filtered_keys: Vec<K>,
     _pd: (PhantomData<K>, PhantomData<V>),
 }
 
-impl<K, V, C, SF> DlCache for &mut Cacher<K, V, C, SF>
+impl<K, V, C> DlCache for &mut Cacher<K, V, C>
 where
     K: CacheKey,
     V: CacheVal,
     C: CacheBounds<K, V>,
-    SF: Fn(&K, &V) -> bool,
 {
     type Key = K;
     type Val = V;
@@ -82,17 +79,16 @@ where
     }
 }
 
-impl<K, V, C, SF> Cacher<K, V, C, SF>
+impl<K, V, C> Cacher<K, V, C>
 where
     K: CacheKey,
     V: CacheVal,
     C: CacheBounds<K, V>,
-    SF: Fn(&K, &V) -> bool + Send + 'static,
 {
-    fn new(cache: C, strategy_fn: SF) -> Cacher<K, V, C, SF> {
+    fn new(cache: C, strategy_fn: impl Fn(&K, &V) -> bool + Send + 'static) -> Cacher<K, V, C> {
         Cacher {
             cache,
-            cache_strategy: strategy_fn,
+            cache_strategy: Box::new(strategy_fn),
             cache_strategy_filtered_keys: Vec::new(),
             _pd: (PhantomData, PhantomData),
         }
@@ -100,11 +96,11 @@ where
 
     async fn get_or_init(
         inner_cache_fn: impl FnOnce() -> C,
-        strategy_fn: SF,
-    ) -> Arc<Mutex<Cacher<K, V, C, SF>>> {
+        strategy_fn: impl Fn(&K, &V) -> bool + Send + 'static,
+    ) -> Arc<Mutex<Cacher<K, V, C>>> {
         let mut caches = CACHES.lock().await;
         let entry = caches
-            .entry::<TyMapKey<(K, V, C, SF)>>()
+            .entry::<TyMapKey<(K, V, C)>>()
             .or_insert(Arc::new(Mutex::new(Self::new(
                 inner_cache_fn(),
                 strategy_fn,
@@ -123,8 +119,8 @@ where
     }
 }
 
-type LocalLoader<'c, K, V, CL, SF> =
-    Loader<K, V, BatchFnWrapper<CL>, &'c mut Cacher<K, V, <CL as CachedLoader<K, V>>::Cache, SF>>;
+type LocalLoader<'c, K, V, CL> =
+    Loader<K, V, BatchFnWrapper<CL>, &'c mut Cacher<K, V, <CL as CachedLoader<K, V>>::Cache>>;
 
 #[async_trait]
 pub trait CachedLoader<K, V>: Send + Sync + Clone + 'static
@@ -138,9 +134,7 @@ where
     fn init_cache() -> Self::Cache;
 
     /// Modify loader params
-    fn init_loader<SF: Fn(&K, &V) -> bool>(
-        loader: LocalLoader<K, V, Self, SF>,
-    ) -> LocalLoader<K, V, Self, SF> {
+    fn init_loader(loader: LocalLoader<K, V, Self>) -> LocalLoader<K, V, Self> {
         loader
     }
 
