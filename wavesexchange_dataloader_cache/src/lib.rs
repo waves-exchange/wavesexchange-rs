@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::{collections::HashMap, hash::Hash};
 use typemap::{ShareCloneMap, TypeMap};
+use wavesexchange_log::error;
 
 static CACHES: Lazy<Mutex<ShareCloneMap>> = Lazy::new(|| Mutex::new(TypeMap::custom()));
 
@@ -140,15 +141,14 @@ pub struct BatchFnWrapper<C>(C);
 #[async_trait]
 impl<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> BatchFn<K, V> for BatchFnWrapper<C> {
     async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
-        self.0
-            .load_fn(keys)
-            .await
-            .into_iter()
-            .enumerate()
-            // we assume that vec with values always has the same length as the one that holds keys
-            // so its ok to index keys vec with values' indexes
-            .map(|(i, v)| (keys[i].clone(), v))
-            .collect()
+        let values = self.0.load_fn(keys).await;
+        if keys.len() != values.len() {
+            error!(
+                "Keys and values vectors aren't length-equal! keys: {:?} ;;; values: {:?}",
+                &keys, &values
+            );
+        }
+        keys.iter().cloned().zip(values).collect()
     }
 }
 
