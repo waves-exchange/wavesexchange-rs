@@ -237,25 +237,17 @@ mod tests {
         }
 
         let loader = Loadable {};
-        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached,).await);
+        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached).await);
 
         //value is cached
         assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_cached).await);
 
-        //rewriting only available cache entry
+        //rewriting the only available cache cell
         assert!(measure_load(&loader, -4, "num: -4".to_string(), is_not_cached).await);
         assert!(measure_load(&loader, -4, "num: -4".to_string(), is_cached).await);
 
         //first value is dropped because cache size is exceeded
-        assert!(
-            measure_load(
-                &loader,
-                -65535isize,
-                "num: -65535".to_string(),
-                is_not_cached,
-            )
-            .await
-        );
+        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached).await);
     }
 
     #[tokio::test]
