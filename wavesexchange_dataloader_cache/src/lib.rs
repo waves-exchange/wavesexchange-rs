@@ -38,7 +38,6 @@ pub struct Cacher<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> {
     cache: C,
     cache_strategy: Box<dyn Fn(&K, &V) -> bool + Send + 'static>,
     cache_strategy_filtered_keys: Vec<K>,
-    _pd: (PhantomData<K>, PhantomData<V>),
 }
 
 impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> DlCache for &mut Cacher<K, V, C> {
@@ -71,7 +70,6 @@ impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> Cacher<K, V, C> {
             cache,
             cache_strategy: Box::new(strategy_fn),
             cache_strategy_filtered_keys: Vec::new(),
-            _pd: (PhantomData, PhantomData),
         }
     }
 
@@ -254,7 +252,7 @@ mod tests {
         assert!(measure_load(&loader, -4, "num: -4".to_string(), is_not_cached).await);
         assert!(measure_load(&loader, -4, "num: -4".to_string(), is_cached).await);
 
-        //first value is dropped because cache size is exceeded
+        //first value is dropped because there can be only one
         assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached).await);
     }
 
