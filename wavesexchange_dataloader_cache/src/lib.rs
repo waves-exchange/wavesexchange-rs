@@ -121,7 +121,7 @@ pub trait CachedLoader<K: CacheKey, V: CacheVal>: Send + Sync + Clone + 'static 
     }
 
     /// Like a method in BatchFn
-    async fn load_fn(&mut self, keys: &[K]) -> HashMap<K, V>;
+    async fn load_fn(&mut self, keys: &[K]) -> Vec<V>;
 
     /// Don't override this
     async fn load(&self, key: K) -> V {
@@ -140,7 +140,15 @@ pub struct BatchFnWrapper<C>(C);
 #[async_trait]
 impl<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> BatchFn<K, V> for BatchFnWrapper<C> {
     async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
-        self.0.load_fn(keys).await
+        self.0
+            .load_fn(keys)
+            .await
+            .into_iter()
+            .enumerate()
+            // we assume that vec with values always has the same length as the one that holds keys
+            // so its ok to index keys vec with values' indexes
+            .map(|(i, v)| (keys[i].clone(), v))
+            .collect()
     }
 }
 
@@ -196,9 +204,9 @@ mod tests {
         impl CachedLoader<u64, String> for Loadable {
             type Cache = TimedCache<u64, String>;
 
-            async fn load_fn(&mut self, keys: &[u64]) -> HashMap<u64, String> {
+            async fn load_fn(&mut self, keys: &[u64]) -> Vec<String> {
                 sleep(SLEEP_DUR).await;
-                HashMap::from_iter(keys.into_iter().map(|k| (*k, format!("num: {}", k))))
+                keys.into_iter().map(|k| format!("num: {}", k)).collect()
             }
 
             fn init_cache() -> Self::Cache {
@@ -226,9 +234,9 @@ mod tests {
         impl CachedLoader<isize, String> for Loadable {
             type Cache = SizedCache<isize, String>;
 
-            async fn load_fn(&mut self, keys: &[isize]) -> HashMap<isize, String> {
+            async fn load_fn(&mut self, keys: &[isize]) -> Vec<String> {
                 sleep(SLEEP_DUR).await;
-                HashMap::from_iter(keys.into_iter().map(|k| (*k, format!("num: {}", k))))
+                keys.into_iter().map(|k| format!("num: {}", k)).collect()
             }
 
             fn init_cache() -> Self::Cache {
@@ -259,19 +267,18 @@ mod tests {
         impl CachedLoader<isize, Option<String>> for Loadable {
             type Cache = UnboundCache<isize, Option<String>>;
 
-            async fn load_fn(&mut self, keys: &[isize]) -> HashMap<isize, Option<String>> {
+            async fn load_fn(&mut self, keys: &[isize]) -> Vec<Option<String>> {
                 sleep(SLEEP_DUR).await;
-                HashMap::from_iter(keys.into_iter().map(|k| {
-                    (
-                        *k,
+                keys.into_iter()
+                    .map(|k| {
                         if k % 2 == 0 {
                             // loader fn returns string only with even numbers
                             Some(format!("num: {}", k))
                         } else {
                             None
-                        },
-                    )
-                }))
+                        }
+                    })
+                    .collect()
             }
 
             fn init_cache() -> Self::Cache {
