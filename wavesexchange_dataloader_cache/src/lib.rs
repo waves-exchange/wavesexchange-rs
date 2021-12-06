@@ -1,5 +1,3 @@
-pub mod typemap;
-
 use cached::async_mutex::Mutex;
 pub use cached::{SizedCache, TimedCache, TimedSizedCache, UnboundCache};
 use dataloader::{
@@ -29,7 +27,9 @@ impl<K: CacheKey, V: CacheVal, T> CacheBounds<K, V> for T where
 #[macro_use]
 extern crate async_trait;
 
-impl<K, V, C, SF> typemap::Key for (K, V, C, SF)
+struct TyMapKey<T>(PhantomData<T>);
+
+impl<K, V, C, SF> typemap::Key for TyMapKey<(K, V, C, SF)>
 where
     K: CacheKey,
     V: CacheVal,
@@ -104,7 +104,7 @@ where
     ) -> Arc<Mutex<Cacher<K, V, C, SF>>> {
         let mut caches = CACHES.lock().await;
         let entry = caches
-            .entry::<(K, V, C, SF)>()
+            .entry::<TyMapKey<(K, V, C, SF)>>()
             .or_insert(Arc::new(Mutex::new(Self::new(
                 inner_cache_fn(),
                 strategy_fn,
@@ -245,11 +245,11 @@ mod tests {
         assert!(measure_load(&loader, 4, "num: 4".to_string(), is_not_cached).await);
 
         //value is cached
-        assert!(measure_load(&loader, 4u64, "num: 4".to_string(), is_cached).await);
+        assert!(measure_load(&loader, 4, "num: 4".to_string(), is_cached).await);
         sleep(Duration::from_secs(3)).await;
 
         //value is dropped due to ttl
-        assert!(measure_load(&loader, 4u64, "num: 4".to_string(), is_not_cached).await);
+        assert!(measure_load(&loader, 4, "num: 4".to_string(), is_not_cached).await);
     }
 
     #[tokio::test]
@@ -272,21 +272,14 @@ mod tests {
         }
 
         let loader = Loadable {};
-        assert!(
-            measure_load(
-                &loader,
-                -65535isize,
-                "num: -65535".to_string(),
-                is_not_cached,
-            )
-            .await
-        );
+        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached,).await);
 
         //value is cached
-        assert!(measure_load(&loader, -65535isize, "num: -65535".to_string(), is_cached).await);
+        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_cached).await);
 
         //rewriting only available cache entry
-        assert!(measure_load(&loader, -4isize, "num: -4".to_string(), is_not_cached).await);
+        assert!(measure_load(&loader, -4, "num: -4".to_string(), is_not_cached).await);
+        assert!(measure_load(&loader, -4, "num: -4".to_string(), is_cached).await);
 
         //first value is dropped because cache size is exceeded
         assert!(
@@ -307,7 +300,7 @@ mod tests {
 
         #[async_trait]
         impl CachedLoader<isize, Option<String>> for Loadable {
-            type Cache = SizedCache<isize, Option<String>>;
+            type Cache = UnboundCache<isize, Option<String>>;
 
             async fn load_fn(&mut self, keys: &[isize]) -> HashMap<isize, Option<String>> {
                 sleep(SLEEP_DUR).await;
@@ -325,7 +318,7 @@ mod tests {
             }
 
             fn init_cache() -> Self::Cache {
-                SizedCache::with_size(50)
+                UnboundCache::new()
             }
 
             fn cache_strategy(_: &isize, v: &Option<String>) -> bool {
@@ -335,10 +328,10 @@ mod tests {
 
         //even number
         let loader = Loadable {};
-        assert!(measure_load(&loader, 28isize, Some("num: 28".to_string()), is_not_cached).await);
+        assert!(measure_load(&loader, 28, Some("num: 28".to_string()), is_not_cached).await);
 
         //is cached
-        assert!(measure_load(&loader, 28isize, Some("num: 28".to_string()), is_cached).await);
+        assert!(measure_load(&loader, 28, Some("num: 28".to_string()), is_cached).await);
 
         //odd number
         assert!(measure_load(&loader, 5, None, is_not_cached).await);
