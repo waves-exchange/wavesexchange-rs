@@ -1,158 +1,17 @@
-use cached::async_mutex::Mutex;
+mod cacher;
+mod loaders;
+
 pub use cached::{SizedCache, TimedCache, TimedSizedCache, UnboundCache};
-use dataloader::{
-    cached::{Cache as DlCache, Loader},
-    BatchFn,
-};
-use once_cell::sync::Lazy;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::sync::Arc;
-use std::{collections::HashMap, hash::Hash};
-use typemap::{ShareCloneMap, TypeMap};
-use wavesexchange_log::error;
-
-static CACHES: Lazy<Mutex<ShareCloneMap>> = Lazy::new(|| Mutex::new(TypeMap::custom()));
-
-pub trait CacheKey: Eq + Hash + Clone + Debug + Send + Sync + 'static {}
-pub trait CacheVal: Clone + Debug + Send + 'static {}
-pub trait CacheBounds<K: CacheKey, V: CacheVal>: cached::Cached<K, V> + Send + 'static {}
-
-impl<T> CacheKey for T where T: Eq + Hash + Clone + Debug + Send + Sync + 'static {}
-impl<T> CacheVal for T where T: Clone + Debug + Send + 'static {}
-impl<K: CacheKey, V: CacheVal, T> CacheBounds<K, V> for T where
-    T: cached::Cached<K, V> + Send + 'static
-{
-}
+pub use loaders::{BaseLoader, CachedLoader, NonCachedLoader};
 
 #[macro_use]
 extern crate async_trait;
 
-struct TyMapKey<T>(PhantomData<T>);
-
-impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> typemap::Key for TyMapKey<(K, V, C)> {
-    type Value = Arc<Mutex<Cacher<K, V, C>>>;
-}
-
-pub struct Cacher<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> {
-    cache: C,
-    cache_strategy: Box<dyn Fn(&K, &V) -> bool + Send + 'static>,
-    cache_strategy_filtered_keys: Vec<K>,
-}
-
-impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> DlCache for &mut Cacher<K, V, C> {
-    type Key = K;
-    type Val = V;
-
-    fn get(&mut self, key: &Self::Key) -> Option<&Self::Val> {
-        self.cache.cache_get(key)
-    }
-
-    fn insert(&mut self, key: Self::Key, val: Self::Val) {
-        if !(self.cache_strategy)(&key, &val) {
-            self.cache_strategy_filtered_keys.push(key.clone());
-        }
-        self.cache.cache_set(key, val);
-    }
-
-    fn remove(&mut self, key: &Self::Key) -> Option<Self::Val> {
-        self.cache.cache_remove(key)
-    }
-
-    fn clear(&mut self) {
-        self.cache.cache_clear()
-    }
-}
-
-impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> Cacher<K, V, C> {
-    fn new(cache: C, strategy_fn: impl Fn(&K, &V) -> bool + Send + 'static) -> Cacher<K, V, C> {
-        Cacher {
-            cache,
-            cache_strategy: Box::new(strategy_fn),
-            cache_strategy_filtered_keys: Vec::new(),
-        }
-    }
-
-    async fn get_or_init(
-        inner_cache_fn: impl FnOnce() -> C,
-        strategy_fn: impl Fn(&K, &V) -> bool + Send + 'static,
-    ) -> Arc<Mutex<Cacher<K, V, C>>> {
-        let mut caches = CACHES.lock().await;
-        let entry = caches
-            .entry::<TyMapKey<(K, V, C)>>()
-            .or_insert(Arc::new(Mutex::new(Self::new(
-                inner_cache_fn(),
-                strategy_fn,
-            ))));
-        entry.clone()
-    }
-
-    fn cleanup(&mut self) {
-        let keys_to_remove = self
-            .cache_strategy_filtered_keys
-            .drain(..)
-            .collect::<Vec<K>>();
-        for key in keys_to_remove {
-            (&mut *self).remove(&key).expect("unreachable");
-        }
-    }
-}
-
-type LocalLoader<'c, K, V, CL> =
-    Loader<K, V, BatchFnWrapper<CL>, &'c mut Cacher<K, V, <CL as CachedLoader<K, V>>::Cache>>;
-
-#[async_trait]
-pub trait CachedLoader<K: CacheKey, V: CacheVal>: Send + Sync + Clone + 'static {
-    type Cache: CacheBounds<K, V>;
-
-    /// Setup cache type
-    fn init_cache() -> Self::Cache;
-
-    /// Modify loader params
-    fn init_loader(loader: LocalLoader<K, V, Self>) -> LocalLoader<K, V, Self> {
-        loader
-    }
-
-    /// I.e. cache only Ok(...), but not Err
-    #[inline]
-    fn cache_strategy(_: &K, _: &V) -> bool {
-        true
-    }
-
-    /// Like a method in BatchFn
-    async fn load_fn(&mut self, keys: &[K]) -> Vec<V>;
-
-    /// Don't override this
-    async fn load(&self, key: K) -> V {
-        let wrapper = BatchFnWrapper(self.clone());
-        let cache = Cacher::get_or_init(Self::init_cache, Self::cache_strategy).await;
-        let mut cache_lock = cache.lock().await;
-        let loader = Loader::with_cache(wrapper, &mut *cache_lock);
-        let result = Self::init_loader(loader).load(key).await;
-        cache_lock.cleanup();
-        result
-    }
-}
-
-pub struct BatchFnWrapper<C>(C);
-
-#[async_trait]
-impl<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> BatchFn<K, V> for BatchFnWrapper<C> {
-    async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
-        let values = self.0.load_fn(keys).await;
-        if keys.len() != values.len() {
-            error!(
-                "Keys and values vectors aren't length-equal! keys: {:?} ;;; values: {:?}",
-                &keys, &values
-            );
-        }
-        keys.iter().cloned().zip(values).collect()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cacher::{CacheKey, CacheVal};
+    use std::fmt::Debug;
     use std::time::{Duration, SystemTime};
     use tokio::time::sleep;
 
@@ -169,17 +28,26 @@ mod tests {
         load_time >= SLEEP_DUR
     }
 
-    async fn measure_load<K: CacheKey, V: CacheVal + Eq, C: CachedLoader<K, V>>(
+    async fn measure_load<
+        E: Debug + Eq,
+        K: CacheKey,
+        V: CacheVal + Eq,
+        C: CachedLoader<K, V, LoadError = E>,
+    >(
         loader: &C,
         key: K,
-        expected_val: V,
+        expected_val: Result<V, E>,
         measure_fn: impl Fn(Duration) -> bool,
     ) -> bool {
         let now = SystemTime::now();
         let result = loader.load(key.clone()).await;
         let elapsed = now.elapsed().unwrap();
         let measurement_is_ok = measure_fn(elapsed);
-        let values_are_eq = result == expected_val;
+        let values_are_eq = match (&result, &expected_val) {
+            (Ok(r), Ok(ev)) => r == ev,
+            (Err(r_err), Err(ev_err)) => r_err == ev_err,
+            _ => false,
+        };
         if !measurement_is_ok {
             println!("Error: measure fn failed!");
         }
@@ -201,10 +69,11 @@ mod tests {
         #[async_trait]
         impl CachedLoader<u64, String> for Loadable {
             type Cache = TimedCache<u64, String>;
+            type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[u64]) -> Vec<String> {
+            async fn load_fn(&mut self, keys: &[u64]) -> Result<Vec<String>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
-                keys.into_iter().map(|k| format!("num: {}", k)).collect()
+                Ok(keys.into_iter().map(|k| format!("num: {}", k)).collect())
             }
 
             fn init_cache() -> Self::Cache {
@@ -213,14 +82,14 @@ mod tests {
         }
 
         let loader = Loadable {};
-        assert!(measure_load(&loader, 4, "num: 4".to_string(), is_not_cached).await);
+        assert!(measure_load(&loader, 4, Ok("num: 4".to_string()), is_not_cached).await);
 
         //value is cached
-        assert!(measure_load(&loader, 4, "num: 4".to_string(), is_cached).await);
+        assert!(measure_load(&loader, 4, Ok("num: 4".to_string()), is_cached).await);
         sleep(Duration::from_secs(3)).await;
 
         //value is dropped due to ttl
-        assert!(measure_load(&loader, 4, "num: 4".to_string(), is_not_cached).await);
+        assert!(measure_load(&loader, 4, Ok("num: 4".to_string()), is_not_cached).await);
     }
 
     #[tokio::test]
@@ -231,10 +100,11 @@ mod tests {
         #[async_trait]
         impl CachedLoader<isize, String> for Loadable {
             type Cache = SizedCache<isize, String>;
+            type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[isize]) -> Vec<String> {
+            async fn load_fn(&mut self, keys: &[isize]) -> Result<Vec<String>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
-                keys.into_iter().map(|k| format!("num: {}", k)).collect()
+                Ok(keys.into_iter().map(|k| format!("num: {}", k)).collect())
             }
 
             fn init_cache() -> Self::Cache {
@@ -243,17 +113,33 @@ mod tests {
         }
 
         let loader = Loadable {};
-        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached).await);
+        assert!(
+            measure_load(
+                &loader,
+                -65535,
+                Ok("num: -65535".to_string()),
+                is_not_cached
+            )
+            .await
+        );
 
         //value is cached
-        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_cached).await);
+        assert!(measure_load(&loader, -65535, Ok("num: -65535".to_string()), is_cached).await);
 
         //rewriting the only available cache cell
-        assert!(measure_load(&loader, -4, "num: -4".to_string(), is_not_cached).await);
-        assert!(measure_load(&loader, -4, "num: -4".to_string(), is_cached).await);
+        assert!(measure_load(&loader, -4, Ok("num: -4".to_string()), is_not_cached).await);
+        assert!(measure_load(&loader, -4, Ok("num: -4".to_string()), is_cached).await);
 
         //first value is dropped because there can be only one
-        assert!(measure_load(&loader, -65535, "num: -65535".to_string(), is_not_cached).await);
+        assert!(
+            measure_load(
+                &loader,
+                -65535,
+                Ok("num: -65535".to_string()),
+                is_not_cached
+            )
+            .await
+        );
     }
 
     #[tokio::test]
@@ -264,10 +150,15 @@ mod tests {
         #[async_trait]
         impl CachedLoader<isize, Option<String>> for Loadable {
             type Cache = UnboundCache<isize, Option<String>>;
+            type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[isize]) -> Vec<Option<String>> {
+            async fn load_fn(
+                &mut self,
+                keys: &[isize],
+            ) -> Result<Vec<Option<String>>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
-                keys.into_iter()
+                Ok(keys
+                    .into_iter()
                     .map(|k| {
                         if k % 2 == 0 {
                             // loader fn returns string only with even numbers
@@ -276,7 +167,7 @@ mod tests {
                             None
                         }
                     })
-                    .collect()
+                    .collect())
             }
 
             fn init_cache() -> Self::Cache {
@@ -290,15 +181,64 @@ mod tests {
 
         //even number
         let loader = Loadable {};
-        assert!(measure_load(&loader, 28, Some("num: 28".to_string()), is_not_cached).await);
+        assert!(measure_load(&loader, 28, Ok(Some("num: 28".to_string())), is_not_cached).await);
 
         //is cached
-        assert!(measure_load(&loader, 28, Some("num: 28".to_string()), is_cached).await);
+        assert!(measure_load(&loader, 28, Ok(Some("num: 28".to_string())), is_cached).await);
 
         //odd number
-        assert!(measure_load(&loader, 5, None, is_not_cached).await);
+        assert!(measure_load(&loader, 5, Ok(None), is_not_cached).await);
 
         //is not cached
-        assert!(measure_load(&loader, 5, None, is_not_cached).await);
+        assert!(measure_load(&loader, 5, Ok(None), is_not_cached).await);
+    }
+
+    #[tokio::test]
+    async fn test_no_cache() {
+        #[derive(Clone)]
+        struct Loadable;
+
+        #[async_trait]
+        impl NonCachedLoader<i64, i64> for Loadable {
+            type LoadError = ();
+
+            async fn load_fn(&mut self, keys: &[i64]) -> Result<Vec<i64>, Self::LoadError> {
+                sleep(SLEEP_DUR).await;
+                Ok(keys.to_vec())
+            }
+        }
+
+        let loader = Loadable {};
+        assert!(measure_load(&loader, 5555, Ok(5555), is_not_cached).await);
+
+        //not caching errors
+        assert!(measure_load(&loader, 5555, Ok(5555), is_not_cached).await);
+    }
+
+    #[tokio::test]
+    async fn test_error_during_loading() {
+        #[derive(Clone)]
+        struct Loadable;
+
+        #[async_trait]
+        impl CachedLoader<isize, ()> for Loadable {
+            type Cache = UnboundCache<isize, ()>;
+            type LoadError = String;
+
+            async fn load_fn(&mut self, _keys: &[isize]) -> Result<Vec<()>, Self::LoadError> {
+                sleep(SLEEP_DUR).await;
+                Err("oh, no!".to_string())
+            }
+
+            fn init_cache() -> Self::Cache {
+                UnboundCache::new()
+            }
+        }
+
+        let loader = Loadable {};
+        assert!(measure_load(&loader, 12345, Err("oh, no!".to_string()), is_not_cached).await);
+
+        //not caching errors
+        assert!(measure_load(&loader, 12345, Err("oh, no!".to_string()), is_not_cached).await);
     }
 }
