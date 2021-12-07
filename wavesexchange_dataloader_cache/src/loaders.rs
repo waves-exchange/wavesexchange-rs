@@ -4,29 +4,20 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use wavesexchange_log::error;
 
-pub trait BaseLoader<K: CacheKey, V: CacheVal, L> {}
+pub type InnerLoader<'b, K, V, L> = non_cached::Loader<K, V, &'b mut BatchFnWrapper<K, V, L>>;
 
-impl<'b, K: CacheKey, V: CacheVal, L: NonCachedLoader<K, V>> BaseLoader<K, V, L>
-    for non_cached::Loader<K, V, &'b mut BatchFnWrapper<K, V, L>>
-{
-}
-
-impl<'b, K: CacheKey, V: CacheVal, L: CachedLoader<K, V>> BaseLoader<K, V, L>
-    for cached::Loader<
-        K,
-        V,
-        &'b mut BatchFnWrapperCached<K, V, L>,
-        &'b mut Cacher<K, V, <L as CachedLoader<K, V>>::Cache>,
-    >
-{
-}
-
+pub type InnerCachedLoader<'b, K, V, L> = cached::Loader<
+    K,
+    V,
+    &'b mut BatchFnWrapperCached<K, V, L>,
+    &'b mut Cacher<K, V, <L as CachedLoader<K, V>>::Cache>,
+>;
 #[async_trait]
 pub trait NonCachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
     type LoadError: Debug + Send;
 
     /// Modify loader params
-    fn init_loader<DL: BaseLoader<K, V, Self>>(loader: DL) -> DL {
+    fn init_loader(loader: InnerLoader<K, V, Self>) -> InnerLoader<K, V, Self> {
         loader
     }
 
@@ -51,7 +42,7 @@ pub trait CachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
     type LoadError: Debug + Send;
 
     /// Modify loader params
-    fn init_loader<DL: BaseLoader<K, V, Self>>(loader: DL) -> DL {
+    fn init_loader(loader: InnerCachedLoader<K, V, Self>) -> InnerCachedLoader<K, V, Self> {
         loader
     }
 
@@ -86,11 +77,11 @@ pub trait CachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
 }
 
 // sorry, waiting for specialization
-pub(crate) struct BatchFnWrapper<K: CacheKey, V: CacheVal, C: NonCachedLoader<K, V>> {
+pub struct BatchFnWrapper<K: CacheKey, V: CacheVal, C: NonCachedLoader<K, V>> {
     inner: C,
     error: Option<C::LoadError>,
 }
-pub(crate) struct BatchFnWrapperCached<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> {
+pub struct BatchFnWrapperCached<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> {
     inner: C,
     error: Option<C::LoadError>,
 }

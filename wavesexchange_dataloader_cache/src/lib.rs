@@ -2,7 +2,7 @@ mod cacher;
 mod loaders;
 
 pub use cached::{SizedCache, TimedCache, TimedSizedCache, UnboundCache};
-pub use loaders::{BaseLoader, CachedLoader, NonCachedLoader};
+pub use loaders::{CachedLoader, InnerCachedLoader, InnerLoader, NonCachedLoader};
 
 #[macro_use]
 extern crate async_trait;
@@ -12,6 +12,7 @@ mod tests {
     use super::*;
     use crate::cacher::{CacheKey, CacheVal};
     use std::fmt::Debug;
+    use std::future::Future;
     use std::time::{Duration, SystemTime};
     use tokio::time::sleep;
 
@@ -28,19 +29,14 @@ mod tests {
         load_time >= SLEEP_DUR
     }
 
-    async fn measure_load<
-        E: Debug + Eq,
-        K: CacheKey,
-        V: CacheVal + Eq,
-        C: CachedLoader<K, V, LoadError = E>,
-    >(
-        loader: &C,
+    async fn _measure<E: Debug + Eq, K: CacheKey, V: CacheVal + Eq>(
         key: K,
         expected_val: Result<V, E>,
+        test_fn: impl Future<Output = Result<V, E>>,
         measure_fn: impl Fn(Duration) -> bool,
     ) -> bool {
         let now = SystemTime::now();
-        let result = loader.load(key.clone()).await;
+        let result = test_fn.await;
         let elapsed = now.elapsed().unwrap();
         let measurement_is_ok = measure_fn(elapsed);
         let values_are_eq = match (&result, &expected_val) {
@@ -59,6 +55,34 @@ mod tests {
             );
         }
         values_are_eq && measurement_is_ok
+    }
+
+    async fn measure_load_noncached<
+        E: Debug + Eq,
+        K: CacheKey,
+        V: CacheVal + Eq,
+        C: NonCachedLoader<K, V, LoadError = E>,
+    >(
+        loader: &C,
+        key: K,
+        expected_val: Result<V, E>,
+        measure_fn: impl Fn(Duration) -> bool,
+    ) -> bool {
+        _measure(key.clone(), expected_val, loader.load(key), measure_fn).await
+    }
+
+    async fn measure_load<
+        E: Debug + Eq,
+        K: CacheKey,
+        V: CacheVal + Eq,
+        C: CachedLoader<K, V, LoadError = E>,
+    >(
+        loader: &C,
+        key: K,
+        expected_val: Result<V, E>,
+        measure_fn: impl Fn(Duration) -> bool,
+    ) -> bool {
+        _measure(key.clone(), expected_val, loader.load(key), measure_fn).await
     }
 
     #[tokio::test]
@@ -199,20 +223,24 @@ mod tests {
         struct Loadable;
 
         #[async_trait]
-        impl NonCachedLoader<i64, i64> for Loadable {
+        impl NonCachedLoader<i32, i64> for Loadable {
             type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[i64]) -> Result<Vec<i64>, Self::LoadError> {
+            async fn load_fn(&mut self, keys: &[i32]) -> Result<Vec<i64>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
-                Ok(keys.to_vec())
+                Ok(keys.into_iter().cloned().map(i64::from).collect())
+            }
+
+            fn init_loader(loader: InnerLoader<i32, i64, Self>) -> InnerLoader<i32, i64, Self> {
+                loader.with_max_batch_size(2)
             }
         }
 
         let loader = Loadable {};
-        assert!(measure_load(&loader, 5555, Ok(5555), is_not_cached).await);
+        assert!(measure_load_noncached(&loader, 5555, Ok(5555), is_not_cached).await);
 
         //not caching errors
-        assert!(measure_load(&loader, 5555, Ok(5555), is_not_cached).await);
+        assert!(measure_load_noncached(&loader, 5555, Ok(5555), is_not_cached).await);
     }
 
     #[tokio::test]
