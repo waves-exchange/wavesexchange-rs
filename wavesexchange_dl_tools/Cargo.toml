@@ -1,5 +1,5 @@
 [package]
-name = "wavesexchange_dataloader_cache"
+name = "wavesexchange_dl_tools"
 version = "0.1.0"
 authors = ["Dmitry Shuranov <dvshur@gmail.com>"]
 edition = "2021"
