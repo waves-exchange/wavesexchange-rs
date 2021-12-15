@@ -21,13 +21,13 @@ pub trait NonCachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
         loader
     }
 
-    /// Like a method in BatchFn
+    /// Setup loader function
     async fn load_fn(&mut self, keys: &[K]) -> Result<Vec<V>, Self::LoadError>;
 
     /// Don't override this
     async fn load(&self, key: K) -> Result<V, Self::LoadError> {
         let mut batch_wrapper = BatchFnWrapper::new(self.clone());
-        let loader = non_cached::Loader::new(&mut batch_wrapper);
+        let loader = InnerLoader::new(&mut batch_wrapper);
         let result = Self::init_loader(loader).load(key.clone()).await;
         match batch_wrapper.error {
             Some(e) => Err(e),
@@ -42,17 +42,18 @@ pub trait CachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
     type LoadError: Debug + Send;
 
     /// Modify loader params
+    #[inline]
     fn init_loader(loader: InnerCachedLoader<K, V, Self>) -> InnerCachedLoader<K, V, Self> {
         loader
     }
 
-    /// Like a method in BatchFn
+    /// Setup loader function
     async fn load_fn(&mut self, keys: &[K]) -> Result<Vec<V>, Self::LoadError>;
 
     /// Setup cache type
     fn init_cache() -> Self::Cache;
 
-    /// I.e. cache only Some(...), but not None
+    /// Determine values that will be cached, i.e. only Some(...), but not None
     #[inline]
     fn cache_strategy(_: &K, _: &V) -> bool {
         true
@@ -63,7 +64,7 @@ pub trait CachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
         let mut batch_wrapper = BatchFnWrapperCached::new(self.clone());
         let cache = Cacher::get_or_init(Self::init_cache, Self::cache_strategy).await;
         let mut cache_lock = cache.lock().await;
-        let loader = cached::Loader::with_cache(&mut batch_wrapper, &mut *cache_lock);
+        let loader = InnerCachedLoader::with_cache(&mut batch_wrapper, &mut *cache_lock);
         let result = Self::init_loader(loader).load(key.clone()).await;
         if batch_wrapper.error.is_some() {
             cache_lock.add_key_to_drop(&key);

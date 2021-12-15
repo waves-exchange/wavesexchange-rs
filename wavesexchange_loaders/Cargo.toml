@@ -1,7 +1,7 @@
 [package]
-name = "wavesexchange_dl_tools"
+name = "wavesexchange_loaders"
 version = "0.1.0"
-authors = ["Dmitry Shuranov <dvshur@gmail.com>"]
+authors = ["Artem Sidorenko <kronos44_0@mail.ru>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
