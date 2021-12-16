@@ -57,29 +57,31 @@ mod tests {
         values_are_eq && measurement_is_ok
     }
 
-    async fn measure_load_noncached<LDR: NonCachedLoader>(
-        loader: &LDR,
-        key: LDR::K,
-        expected_val: Result<LDR::V, LDR::LoadError>,
+    async fn measure_load_noncached<
+        E: Debug + Eq,
+        K: CacheKey,
+        V: CacheVal + Eq,
+        C: NonCachedLoader<K, V, LoadError = E>,
+    >(
+        loader: &C,
+        key: K,
+        expected_val: Result<V, E>,
         measure_fn: impl Fn(Duration) -> bool,
-    ) -> bool
-    where
-        LDR::V: CacheVal + Eq,
-        LDR::LoadError: Debug + Eq,
-    {
+    ) -> bool {
         _measure(key.clone(), expected_val, loader.load(key), measure_fn).await
     }
 
-    async fn measure_load<LDR: CachedLoader>(
-        loader: &LDR,
-        key: LDR::K,
-        expected_val: Result<LDR::V, LDR::LoadError>,
+    async fn measure_load<
+        E: Debug + Eq,
+        K: CacheKey,
+        V: CacheVal + Eq,
+        C: CachedLoader<K, V, LoadError = E>,
+    >(
+        loader: &C,
+        key: K,
+        expected_val: Result<V, E>,
         measure_fn: impl Fn(Duration) -> bool,
-    ) -> bool
-    where
-        LDR::V: CacheVal + Eq,
-        LDR::LoadError: Debug + Eq,
-    {
+    ) -> bool {
         _measure(key.clone(), expected_val, loader.load(key), measure_fn).await
     }
 
@@ -89,13 +91,11 @@ mod tests {
         struct Loadable;
 
         #[async_trait]
-        impl CachedLoader for Loadable {
-            type K = u64;
-            type V = String;
-            type Cache = TimedCache<Self::K, Self::V>;
+        impl CachedLoader<u64, String> for Loadable {
+            type Cache = TimedCache<u64, String>;
             type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[Self::K]) -> Result<Vec<Self::V>, Self::LoadError> {
+            async fn load_fn(&mut self, keys: &[u64]) -> Result<Vec<String>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
                 Ok(keys.into_iter().map(|k| format!("num: {}", k)).collect())
             }
@@ -122,13 +122,11 @@ mod tests {
         struct Loadable;
 
         #[async_trait]
-        impl CachedLoader for Loadable {
-            type K = isize;
-            type V = String;
-            type Cache = SizedCache<Self::K, Self::V>;
+        impl CachedLoader<isize, String> for Loadable {
+            type Cache = SizedCache<isize, String>;
             type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[Self::K]) -> Result<Vec<Self::V>, Self::LoadError> {
+            async fn load_fn(&mut self, keys: &[isize]) -> Result<Vec<String>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
                 Ok(keys.into_iter().map(|k| format!("num: {}", k)).collect())
             }
@@ -174,13 +172,14 @@ mod tests {
         struct Loadable;
 
         #[async_trait]
-        impl CachedLoader for Loadable {
-            type K = isize;
-            type V = Option<String>;
-            type Cache = UnboundCache<Self::K, Self::V>;
+        impl CachedLoader<isize, Option<String>> for Loadable {
+            type Cache = UnboundCache<isize, Option<String>>;
             type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[Self::K]) -> Result<Vec<Self::V>, Self::LoadError> {
+            async fn load_fn(
+                &mut self,
+                keys: &[isize],
+            ) -> Result<Vec<Option<String>>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
                 Ok(keys
                     .into_iter()
@@ -224,17 +223,15 @@ mod tests {
         struct Loadable;
 
         #[async_trait]
-        impl NonCachedLoader for Loadable {
-            type K = i32;
-            type V = i64;
+        impl NonCachedLoader<i32, i64> for Loadable {
             type LoadError = ();
 
-            async fn load_fn(&mut self, keys: &[Self::K]) -> Result<Vec<Self::V>, Self::LoadError> {
+            async fn load_fn(&mut self, keys: &[i32]) -> Result<Vec<i64>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
                 Ok(keys.into_iter().cloned().map(i64::from).collect())
             }
 
-            fn init_loader(loader: InnerLoader<Self>) -> InnerLoader<Self> {
+            fn init_loader(loader: InnerLoader<i32, i64, Self>) -> InnerLoader<i32, i64, Self> {
                 loader.with_max_batch_size(2)
             }
         }
@@ -250,16 +247,11 @@ mod tests {
         struct Loadable;
 
         #[async_trait]
-        impl CachedLoader for Loadable {
-            type K = isize;
-            type V = ();
-            type Cache = UnboundCache<Self::K, Self::V>;
+        impl CachedLoader<isize, ()> for Loadable {
+            type Cache = UnboundCache<isize, ()>;
             type LoadError = String;
 
-            async fn load_fn(
-                &mut self,
-                _keys: &[Self::K],
-            ) -> Result<Vec<Self::V>, Self::LoadError> {
+            async fn load_fn(&mut self, _keys: &[isize]) -> Result<Vec<()>, Self::LoadError> {
                 sleep(SLEEP_DUR).await;
                 Err("oh, no!".to_string())
             }

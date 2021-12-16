@@ -4,39 +4,29 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use wavesexchange_log::error;
 
-pub type InnerLoader<'b, LDR> = non_cached::Loader<
-    <LDR as NonCachedLoader>::K,
-    <LDR as NonCachedLoader>::V,
-    &'b mut BatchFnWrapper<LDR>,
->;
+pub type InnerLoader<'b, K, V, L> = non_cached::Loader<K, V, &'b mut BatchFnWrapper<K, V, L>>;
 
-pub type InnerCachedLoader<'b, LDR> = cached::Loader<
-    <LDR as CachedLoader>::K,
-    <LDR as CachedLoader>::V,
-    &'b mut BatchFnWrapperCached<LDR>,
-    &'b mut Cacher<
-        <LDR as CachedLoader>::K,
-        <LDR as CachedLoader>::V,
-        <LDR as CachedLoader>::Cache,
-    >,
+pub type InnerCachedLoader<'b, K, V, L> = cached::Loader<
+    K,
+    V,
+    &'b mut BatchFnWrapperCached<K, V, L>,
+    &'b mut Cacher<K, V, <L as CachedLoader<K, V>>::Cache>,
 >;
 #[async_trait]
-pub trait NonCachedLoader: SharedObj + Clone {
-    type K: CacheKey;
-    type V: CacheVal;
+pub trait NonCachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
     type LoadError: Debug + Send;
 
     /// Modify loader params
     #[inline]
-    fn init_loader(loader: InnerLoader<Self>) -> InnerLoader<Self> {
+    fn init_loader(loader: InnerLoader<K, V, Self>) -> InnerLoader<K, V, Self> {
         loader
     }
 
     /// Setup loader function
-    async fn load_fn(&mut self, keys: &[Self::K]) -> Result<Vec<Self::V>, Self::LoadError>;
+    async fn load_fn(&mut self, keys: &[K]) -> Result<Vec<V>, Self::LoadError>;
 
     /// Don't override this
-    async fn load(&self, key: Self::K) -> Result<Self::V, Self::LoadError> {
+    async fn load(&self, key: K) -> Result<V, Self::LoadError> {
         let mut batch_wrapper = BatchFnWrapper::new(self.clone());
         let loader = InnerLoader::new(&mut batch_wrapper);
         let result = Self::init_loader(loader).load(key.clone()).await;
@@ -48,32 +38,30 @@ pub trait NonCachedLoader: SharedObj + Clone {
 }
 
 #[async_trait]
-pub trait CachedLoader: SharedObj + Clone {
-    type K: CacheKey;
-    type V: CacheVal;
-    type Cache: CacheBounds<Self::K, Self::V>;
+pub trait CachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
+    type Cache: CacheBounds<K, V>;
     type LoadError: Debug + Send;
 
     /// Modify loader params
     #[inline]
-    fn init_loader(loader: InnerCachedLoader<Self>) -> InnerCachedLoader<Self> {
+    fn init_loader(loader: InnerCachedLoader<K, V, Self>) -> InnerCachedLoader<K, V, Self> {
         loader
     }
 
     /// Setup loader function
-    async fn load_fn(&mut self, keys: &[Self::K]) -> Result<Vec<Self::V>, Self::LoadError>;
+    async fn load_fn(&mut self, keys: &[K]) -> Result<Vec<V>, Self::LoadError>;
 
     /// Setup cache type
     fn init_cache() -> Self::Cache;
 
     /// Determine values that will be cached, i.e. only Some(...), but not None
     #[inline]
-    fn cache_strategy(_: &Self::K, _: &Self::V) -> bool {
+    fn cache_strategy(_: &K, _: &V) -> bool {
         true
     }
 
     /// Don't override this
-    async fn load(&self, key: Self::K) -> Result<Self::V, Self::LoadError> {
+    async fn load(&self, key: K) -> Result<V, Self::LoadError> {
         let mut batch_wrapper = BatchFnWrapperCached::new(self.clone());
         let cache = Cacher::get_or_init(Self::init_cache, Self::cache_strategy).await;
         let mut cache_lock = cache.lock().await;
@@ -91,30 +79,32 @@ pub trait CachedLoader: SharedObj + Clone {
 }
 
 // sorry, waiting for specialization
-pub struct BatchFnWrapper<L: NonCachedLoader> {
-    inner: L,
-    error: Option<L::LoadError>,
+pub struct BatchFnWrapper<K: CacheKey, V: CacheVal, C: NonCachedLoader<K, V>> {
+    inner: C,
+    error: Option<C::LoadError>,
 }
-pub struct BatchFnWrapperCached<L: CachedLoader> {
-    inner: L,
-    error: Option<L::LoadError>,
+pub struct BatchFnWrapperCached<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> {
+    inner: C,
+    error: Option<C::LoadError>,
 }
 
-impl<L: NonCachedLoader> BatchFnWrapper<L> {
-    pub fn new(inner: L) -> Self {
+impl<K: CacheKey, V: CacheVal, C: NonCachedLoader<K, V>> BatchFnWrapper<K, V, C> {
+    pub fn new(inner: C) -> Self {
         BatchFnWrapper { inner, error: None }
     }
 }
 
-impl<L: CachedLoader> BatchFnWrapperCached<L> {
-    pub fn new(inner: L) -> Self {
+impl<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> BatchFnWrapperCached<K, V, C> {
+    pub fn new(inner: C) -> Self {
         BatchFnWrapperCached { inner, error: None }
     }
 }
 
 #[async_trait]
-impl<L: NonCachedLoader> BatchFn<L::K, L::V> for &mut BatchFnWrapper<L> {
-    async fn load(&mut self, keys: &[L::K]) -> HashMap<L::K, L::V> {
+impl<K: CacheKey, V: CacheVal, C: NonCachedLoader<K, V>> BatchFn<K, V>
+    for &mut BatchFnWrapper<K, V, C>
+{
+    async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
         let values = self.inner.load_fn(keys).await;
         let (values, err) = check_values(keys, values);
         self.error = err;
@@ -123,8 +113,10 @@ impl<L: NonCachedLoader> BatchFn<L::K, L::V> for &mut BatchFnWrapper<L> {
 }
 
 #[async_trait]
-impl<L: CachedLoader> BatchFn<L::K, L::V> for &mut BatchFnWrapperCached<L> {
-    async fn load(&mut self, keys: &[L::K]) -> HashMap<L::K, L::V> {
+impl<K: CacheKey, V: CacheVal, C: CachedLoader<K, V>> BatchFn<K, V>
+    for &mut BatchFnWrapperCached<K, V, C>
+{
+    async fn load(&mut self, keys: &[K]) -> HashMap<K, V> {
         let values = self.inner.load_fn(keys).await;
         let (values, err) = check_values(keys, values);
         self.error = err;
