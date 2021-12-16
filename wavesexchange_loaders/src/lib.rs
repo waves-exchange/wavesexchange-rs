@@ -13,7 +13,7 @@ mod tests {
     use crate::cacher::{CacheKey, CacheVal};
     use std::fmt::Debug;
     use std::future::Future;
-    use std::time::{Duration, SystemTime};
+    use std::time::{Duration, Instant};
     use tokio::time::sleep;
 
     //upper border, cached values are usually extracted faster
@@ -35,9 +35,9 @@ mod tests {
         test_fn: impl Future<Output = Result<V, E>>,
         measure_fn: impl Fn(Duration) -> bool,
     ) -> bool {
-        let now = SystemTime::now();
+        let now = Instant::now();
         let result = test_fn.await;
-        let elapsed = now.elapsed().unwrap();
+        let elapsed = now.elapsed();
         let measurement_is_ok = measure_fn(elapsed);
         let values_are_eq = match (&result, &expected_val) {
             (Ok(r), Ok(ev)) => r == ev,
@@ -86,7 +86,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_timed() {
+    async fn test_timed_cache() {
         #[derive(Clone)]
         struct Loadable;
 
@@ -117,7 +117,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sized() {
+    async fn test_sized_cache() {
         #[derive(Clone)]
         struct Loadable;
 
@@ -238,8 +238,6 @@ mod tests {
 
         let loader = Loadable {};
         assert!(measure_load_noncached(&loader, 5555, Ok(5555), is_not_cached).await);
-
-        //not caching errors
         assert!(measure_load_noncached(&loader, 5555, Ok(5555), is_not_cached).await);
     }
 

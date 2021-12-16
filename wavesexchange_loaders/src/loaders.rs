@@ -17,6 +17,7 @@ pub trait NonCachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
     type LoadError: Debug + Send;
 
     /// Modify loader params
+    #[inline]
     fn init_loader(loader: InnerLoader<K, V, Self>) -> InnerLoader<K, V, Self> {
         loader
     }
@@ -140,7 +141,8 @@ fn check_values<K: CacheKey, V: CacheVal, E: Debug>(
         Err(e) => {
             let placeholder_value = V::default();
             // even on error we need to fill cache with some values
-            // because dataloader is sad when they are not present
+            // because dataloader is sad when they are not present,
+            // they'll be deleted soon
             (
                 keys.iter()
                     .cloned()
