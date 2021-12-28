@@ -19,43 +19,62 @@ pub type InnerCachedLoader<'b, K, V, L> = cached::Loader<
 
 #[async_trait]
 pub trait NonCachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
+    /// Setup error type for `Loader::load` method
     type Error: ErrBounds;
 
     /// Modify loader params
+    ///
+    /// See the dataloader [`docs`](https://docs.rs/dataloader/latest/dataloader/non_cached/struct.Loader.html)
     #[inline]
     fn init_loader(loader: InnerLoader<K, V, Self>) -> InnerLoader<K, V, Self> {
         loader
     }
 
-    /// Setup loader function
+    /// Setup loader function.  
+    ///
+    /// It is important to return as many values as keys were provided,
+    /// otherwise dataloader wouldn't process them and return `LoaderError::MissingValues`
     async fn load_fn(&mut self, keys: &[K]) -> Result<Vec<V>, Self::Error>;
 }
 
 #[async_trait]
 pub trait CachedLoader<K: CacheKey, V: CacheVal>: SharedObj + Clone {
+    /// Setup cache that will be used
+    ///
+    /// See allowed caches [`here`](https://docs.rs/cached/latest/cached/#structs)
     type Cache: CacheBounds<K, V>;
+
+    /// Setup error type for `Loader::load` method
     type Error: ErrBounds;
 
     /// Modify loader params
+    ///
+    /// See the dataloader [`docs`](https://docs.rs/dataloader/latest/dataloader/cached/struct.Loader.html)
     #[inline]
     fn init_loader(loader: InnerCachedLoader<K, V, Self>) -> InnerCachedLoader<K, V, Self> {
         loader
     }
 
-    /// Setup loader function
+    /// Setup loader function.  
+    ///
+    /// It is important to return as many values as keys were provided,
+    /// otherwise dataloader wouldn't process them and return `LoaderError::MissingValues`
     async fn load_fn(&mut self, keys: &[K]) -> Result<Vec<V>, Self::Error>;
 
     /// Setup cache params
+    ///
+    /// See params for all caches [`here`](https://docs.rs/cached/latest/cached/#structs)
     fn init_cache() -> Self::Cache;
 
-    /// Determine values that will be cached, i.e. only Some(...), but not None
+    /// Determine values that will be cached, i.e. only `Some(...)`, but not `None`
     #[inline]
     fn cache_strategy(_: &K, _: &V) -> bool {
         true
     }
 }
 
-/// Use this trait only for import, no need to impl it
+/// Just import this trait and use `.load()` or `.load_many()` on any struct
+/// that implements `CachedLoader` or `NonCachedLoader`
 #[async_trait]
 pub trait Loader<K, V, E: ErrBounds, const HAS_CACHE: bool> {
     async fn load(&self, key: K) -> Result<V, LoaderError<E>>;

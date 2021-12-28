@@ -1,3 +1,45 @@
+/*!
+> Combine `dataloader` and `cached` libs.
+
+`wavesexchange_loaders` provides interfaces to create cached or non-cached dataloaders.
+
+Usage example:
+```rust
+mod define {
+    use wavesexchange_loaders::{CachedLoader, SizedCache}
+    use error::MyBeautifulError;
+
+    struct SomeLoaderStruct;
+
+    impl CachedLoader<i32, String> for SomeLoaderStruct {
+        type Cache = TimedCache<i32, String>;
+        type Error = MyBeautifulError;
+
+        // Note: vec of values and array of keys must have the same size
+        async fn load_fn(&mut self, keys: &[u64]) -> Result<Vec<String>, Self::Error> {
+            Ok(keys.into_iter().map(|k| format!("num: {}", k)).collect())
+        }
+
+        // keys will be cached for 3 seconds
+        fn init_cache() -> Self::Cache {
+            TimedCache::with_lifespan(3)
+        }
+    }
+}
+
+mod usage {
+    use super::define::SomeLoaderStruct;
+    use wavesexchange_loaders::{Loader, LoaderError};
+
+    let s = SomeLoaderStruct {};
+    // result type is listed here just for clarity,
+    // the .load() argument type annotation is enough for compiler to infer other types
+    let result: Result<String, LoaderError<MyBeautifulError>> = s.load(5i32);
+}
+```
+
+*/
+
 mod cacher;
 mod error;
 mod loaders;
