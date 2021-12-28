@@ -1,6 +1,6 @@
 [package]
 name = "wavesexchange_loaders"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Artem Sidorenko <kronos44_0@mail.ru>"]
 edition = "2021"
 
