@@ -11,13 +11,15 @@ static CACHES: Lazy<Mutex<ShareCloneMap>> = Lazy::new(|| Mutex::new(TypeMap::cus
 
 pub trait SharedObj: Send + Sync + 'static {}
 pub trait CacheKey: Eq + Hash + Clone + Debug + SharedObj {}
-pub trait CacheVal: Default + Clone + Debug + SharedObj {}
+pub trait CacheVal: Clone + Debug + SharedObj {}
 pub trait CacheBounds<K: CacheKey, V: CacheVal>: cached::Cached<K, V> + SharedObj {}
+pub trait ErrBounds: Debug + Send {}
 
 impl<T> SharedObj for T where T: Send + Sync + 'static {}
 impl<T> CacheKey for T where T: Eq + Hash + Clone + Debug + SharedObj {}
-impl<T> CacheVal for T where T: Default + Clone + Debug + SharedObj {}
+impl<T> CacheVal for T where T: Clone + Debug + SharedObj {}
 impl<K: CacheKey, V: CacheVal, T> CacheBounds<K, V> for T where T: cached::Cached<K, V> + SharedObj {}
+impl<T> ErrBounds for T where T: Debug + Send {}
 
 struct TyMapKey<T>(PhantomData<T>);
 
@@ -85,9 +87,7 @@ impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> Cacher<K, V, C> {
     pub fn cleanup(&mut self) {
         let keys_to_remove = self.keys_to_drop.drain(..).collect::<Vec<K>>();
         for key in keys_to_remove {
-            (&mut *self)
-                .remove(&key)
-                .expect(&format!("key '{:?}' doesn't exist", key));
+            (&mut *self).remove(&key);
         }
     }
 }
