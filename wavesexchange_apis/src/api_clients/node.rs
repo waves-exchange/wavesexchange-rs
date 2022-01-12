@@ -1,4 +1,5 @@
 use self::dto::*;
+use crate::models::{DataEntry, DataEntryValue};
 use crate::{ApiBaseUrl, Error, HttpClient};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -149,22 +150,8 @@ impl NodeApi for HttpClient {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DataEntry {
-    pub key: String,
-    pub value: DataEntryValue,
-}
-
-#[derive(Debug, Clone)]
-pub enum DataEntryValue {
-    String(String),
-    Integer(i64),
-    // Boolean(bool),
-    // Binary(Vec<u8>),
-}
-
 pub mod dto {
-    use super::{DataEntry, DataEntryValue};
+    use super::*;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
