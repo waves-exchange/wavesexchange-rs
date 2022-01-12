@@ -23,14 +23,6 @@ pub fn handler<E: Reject>(
 
         if r.is_not_found() {
             resp = not_found(error_code_prefix.clone());
-        } else if let Some(_) = r.find::<warp::reject::MethodNotAllowed>() {
-            resp = method_not_allowed(error_code_prefix.clone());
-        } else if let Some(_) = r.find::<warp::reject::UnsupportedMediaType>() {
-            resp = unsuported_media_type(error_code_prefix.clone());
-        } else if let Some(e) = r.find::<warp::reject::InvalidQuery>() {
-            let mut details = HashMap::with_capacity(1);
-            details.insert("reason".to_string(), e.to_string());
-            resp = validation::query_deserialization(error_code_prefix.clone(), Some(details));
         } else if let Some(e) = r.find::<warp::filters::body::BodyDeserializeError>() {
             let mut details = HashMap::with_capacity(1);
             details.insert("reason".to_string(), e.to_string());
@@ -45,6 +37,21 @@ pub fn handler<E: Reject>(
             resp = validation::missing_header(error_code_prefix.clone(), Some(details));
         } else if let Some(crate_error) = r.find::<E>() {
             resp = handler(crate_error);
+        } else 
+        // this handler should be after custom error handler:
+        // there are maybe cases with the same endpoint path, but different methods (get + post),
+        // if one of them raise an rejection, the second one raise it too - warp::reject::MethodNotAllowed
+        // and if this handler will be at the top of error handlers sequence, it will always handled first of all
+        // and clients will not receive actual error
+        // similar issue discussion: https://github.com/seanmonstar/warp/issues/77
+        if let Some(_) = r.find::<warp::reject::MethodNotAllowed>() {
+            resp = method_not_allowed(error_code_prefix.clone());
+        } else if let Some(_) = r.find::<warp::reject::UnsupportedMediaType>() {
+            resp = unsuported_media_type(error_code_prefix.clone());
+        } else if let Some(e) = r.find::<warp::reject::InvalidQuery>() {
+            let mut details = HashMap::with_capacity(1);
+            details.insert("reason".to_string(), e.to_string());
+            resp = validation::query_deserialization(error_code_prefix.clone(), Some(details));
         } else {
             resp = internal(error_code_prefix.clone());
         }
