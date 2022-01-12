@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, GrpcClient};
 use itertools::Itertools;
 use std::{
     collections::HashMap,
@@ -7,7 +7,6 @@ use std::{
 };
 use waves_protobuf_schemas::waves::events::{
     blockchain_updated::{Append, Update},
-    grpc::blockchain_updates_api_client::BlockchainUpdatesApiClient,
     grpc::{GetBlockUpdateRequest, GetBlockUpdateResponse},
     state_update::BalanceUpdate,
     BlockchainUpdated,
@@ -19,21 +18,6 @@ pub trait BlockchainUpdatesApi {
         &self,
         height: u32,
     ) -> Result<TransactionsAtHeight, Error>;
-}
-
-#[derive(Clone)]
-pub struct GrpcClient {
-    grpc_client: BlockchainUpdatesApiClient<tonic::transport::Channel>,
-}
-
-impl GrpcClient {
-    pub async fn new(blockchain_updates_url: &str) -> Result<Self, Error> {
-        Ok(GrpcClient {
-            grpc_client: BlockchainUpdatesApiClient::connect(blockchain_updates_url.to_owned())
-                .await
-                .map_err(Arc::new)?,
-        })
-    }
 }
 
 #[async_trait]
