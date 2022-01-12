@@ -5,7 +5,7 @@ use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use wavesexchange_log::debug;
 
 #[async_trait]
-pub trait StateServiceApi: ApiBaseUrl {
+pub trait StateSvcApi: ApiBaseUrl {
     async fn get(
         &self,
         address: impl AsRef<str> + Send + 'async_trait,
@@ -27,7 +27,7 @@ pub enum HistoryPeg {
 }
 
 #[async_trait]
-impl StateServiceApi for HttpClient {
+impl StateSvcApi for HttpClient {
     async fn get(
         &self,
         address: impl AsRef<str> + Send + 'async_trait,

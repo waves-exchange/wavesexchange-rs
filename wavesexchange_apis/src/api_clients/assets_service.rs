@@ -5,7 +5,7 @@ use std::sync::Arc;
 use wavesexchange_log::{timer, trace};
 
 #[async_trait]
-pub trait AssetsApi: ApiBaseUrl {
+pub trait AssetsSvcApi: ApiBaseUrl {
     async fn get<S, I>(&self, asset_ids: I, height: Option<u32>) -> Result<Vec<AssetInfo>, Error>
     where
         S: AsRef<str> + Send,
@@ -18,7 +18,7 @@ pub struct AssetInfo {
 }
 
 #[async_trait]
-impl AssetsApi for HttpClient {
+impl AssetsSvcApi for HttpClient {
     async fn get<S, I>(&self, asset_ids: I, height: Option<u32>) -> Result<Vec<AssetInfo>, Error>
     where
         S: AsRef<str> + Send,
