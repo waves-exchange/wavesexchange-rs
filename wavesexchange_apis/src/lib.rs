@@ -14,3 +14,6 @@ pub use clients::{
     http::{ApiBaseUrl, HttpClient},
 };
 pub use error::Error;
+
+// reexport api traits
+pub use api_clients::*;
