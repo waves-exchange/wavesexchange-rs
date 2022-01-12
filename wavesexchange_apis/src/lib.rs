@@ -1,9 +1,13 @@
 mod client;
 mod error;
-pub mod node;
+#[cfg(test)]
+mod tests;
+
+pub mod api_clients;
+pub mod models;
 
 #[macro_use]
 extern crate async_trait;
 
-pub use client::HttpClient;
+pub use client::{ApiBaseUrl, HttpClient};
 pub use error::Error;
