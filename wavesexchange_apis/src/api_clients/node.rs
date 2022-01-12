@@ -1,12 +1,11 @@
-use super::{Error, HttpClient};
-use models::*;
+use self::dto::*;
+use crate::{ApiBaseUrl, Error, HttpClient};
 use reqwest::StatusCode;
-use serde::Deserialize;
 use serde_json::json;
 use wavesexchange_log::debug;
 
 #[async_trait]
-pub trait NodeApi {
+pub trait NodeApi: ApiBaseUrl {
     async fn data_entries(
         &self,
         address: impl AsRef<str> + Send + 'async_trait,
@@ -17,7 +16,7 @@ pub trait NodeApi {
         &self,
         dapp: impl AsRef<str> + Send + 'async_trait,
         expression: impl AsRef<str> + Send + 'async_trait,
-    ) -> Result<script::Value, Error>;
+    ) -> Result<Value, Error>;
 
     async fn get_last_height(&self) -> Result<i32, Error>;
 }
@@ -80,7 +79,7 @@ impl NodeApi for HttpClient {
         &self,
         dapp: impl AsRef<str> + Send + 'async_trait,
         expression: impl AsRef<str> + Send + 'async_trait,
-    ) -> Result<script::Value, Error> {
+    ) -> Result<Value, Error> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
 
@@ -164,13 +163,9 @@ pub enum DataEntryValue {
     // Binary(Vec<u8>),
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct LastHeight {
-    height: i32,
-}
-
-pub mod script {
-    use serde::Deserialize;
+pub mod dto {
+    use super::{DataEntry, DataEntryValue};
+    use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
     #[derive(Debug, Clone, Deserialize)]
@@ -198,20 +193,20 @@ pub mod script {
         Int { value: i64 },
         // todo other types
     }
-}
 
-mod models {
-    use super::{script, DataEntry, DataEntryValue};
-    use serde::{Deserialize, Serialize};
+    #[derive(Debug, Clone, Deserialize)]
+    pub(super) struct LastHeight {
+        pub height: i32,
+    }
 
     #[derive(Debug, Serialize)]
-    pub struct StateRequest {
+    pub(super) struct StateRequest {
         pub keys: Vec<String>,
     }
 
     #[derive(Debug, Deserialize)]
     #[serde(tag = "type")]
-    pub enum DataEntryResponse {
+    pub(super) enum DataEntryResponse {
         #[serde(rename = "string")]
         String { key: String, value: String },
         #[serde(rename = "integer")]
@@ -234,18 +229,18 @@ mod models {
     }
 
     #[derive(Debug, Deserialize)]
-    pub struct EvaluateResponse {
-        pub result: script::Value,
+    pub(super) struct EvaluateResponse {
+        pub result: Value,
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::config::tests::{MAINNET, TESTNET};
+    use crate::tests::blockchains::{MAINNET, TESTNET};
 
     pub fn mainnet_client() -> HttpClient {
-        HttpClient::from_root_url(&MAINNET.upstream.node_url)
+        HttpClient::from_base_url(MAINNET::node_url)
     }
 
     #[tokio::test]
@@ -256,7 +251,7 @@ pub mod tests {
             .collect();
 
         let data_entries = mainnet_client()
-            .data_entries(&MAINNET.addresses.defo_control_contract, keys)
+            .data_entries(MAINNET::defo_control_contract, keys)
             .await
             .unwrap();
 
@@ -264,13 +259,11 @@ pub mod tests {
         assert_eq!(data_entries.first().unwrap().key, "%s%s__price__UAH");
     }
 
-    use script::*;
-
     #[tokio::test]
     async fn evaluate() {
-        let result = HttpClient::from_root_url(&TESTNET.upstream.node_url)
+        let result = HttpClient::from_base_url(TESTNET::node_url)
             .evaluate(
-                &TESTNET.any_stake.products[0].contract_address,
+                &TESTNET::products[0].contract_address,
                 "privateCurrentSysParamsREST(\"5Sh9KghfkZyhjwuodovDhB6PghDUGBHiAPZ4MkrPgKtX\")",
             )
             .await

@@ -2,7 +2,7 @@ use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder};
 
 #[derive(Clone)]
 pub struct HttpClient {
-    pub root_url: Option<String>,
+    pub base_url: Option<String>,
     client: Client,
 }
 
@@ -15,13 +15,13 @@ impl HttpClient {
         HttpClientBuilder::new()
     }
 
-    pub fn from_root_url(url: impl Into<String>) -> Self {
-        HttpClientBuilder::new().with_root_url(url).build()
+    pub fn from_base_url(url: impl Into<String>) -> Self {
+        HttpClientBuilder::new().with_base_url(url).build()
     }
 
     fn prepare_url(&self, url: impl Into<String>) -> String {
-        match &self.root_url {
-            Some(ru) => format!("{}/{}", ru, url.into()),
+        match &self.base_url {
+            Some(u) => format!("{}/{}", u, url.into()),
             None => url.into(),
         }
     }
@@ -42,20 +42,20 @@ impl HttpClient {
 }
 
 pub struct HttpClientBuilder {
-    root_url: Option<String>,
+    base_url: Option<String>,
     builder: ClientBuilder,
 }
 
 impl HttpClientBuilder {
     pub fn new() -> Self {
         HttpClientBuilder {
-            root_url: None,
+            base_url: None,
             builder: ClientBuilder::new(),
         }
     }
 
-    pub fn with_root_url(mut self, url: impl Into<String>) -> Self {
-        self.root_url = Some(url.into());
+    pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
+        self.base_url = Some(url.into());
         self
     }
 
@@ -67,12 +67,25 @@ impl HttpClientBuilder {
     pub fn try_build(mut self) -> Result<HttpClient, ReqError> {
         self.builder = self.builder.pool_max_idle_per_host(1);
         Ok(HttpClient {
-            root_url: self.root_url,
+            base_url: self.base_url,
             client: self.builder.build()?,
         })
     }
 
     pub fn build(self) -> HttpClient {
         self.try_build().unwrap()
+    }
+}
+
+pub trait ApiBaseUrl {
+    fn base_url(&self) -> String;
+}
+
+impl ApiBaseUrl for HttpClient {
+    fn base_url(&self) -> String {
+        match &self.base_url {
+            Some(s) => s.clone(),
+            None => String::new(),
+        }
     }
 }
