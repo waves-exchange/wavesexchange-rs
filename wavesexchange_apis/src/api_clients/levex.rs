@@ -155,7 +155,7 @@ impl Price {
 }
 
 #[allow(dead_code)]
-mod dto {
+pub mod dto {
     use serde::Deserialize;
 
     #[derive(Deserialize)]

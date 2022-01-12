@@ -128,7 +128,7 @@ impl StateServiceApi for HttpClient {
     }
 }
 
-mod dto {
+pub mod dto {
     use serde::Deserialize;
 
     #[derive(Debug, Clone, Deserialize)]
