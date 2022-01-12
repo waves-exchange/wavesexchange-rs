@@ -2,7 +2,7 @@ use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder};
 
 #[derive(Clone)]
 pub struct HttpClient {
-    pub base_url: Option<String>,
+    base_url: Option<String>,
     client: Client,
 }
 
