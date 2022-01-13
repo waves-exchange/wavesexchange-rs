@@ -77,7 +77,7 @@ impl HttpClientBuilder {
     }
 }
 
-pub trait ApiBaseUrl {
+pub trait ApiBaseUrl: Clone + Send + Sync + 'static {
     fn base_url(&self) -> String;
 }
 
