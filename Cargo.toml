@@ -4,4 +4,5 @@ members = [
     "wavesexchange_log",
     "wavesexchange_warp",
     "wavesexchange_topic",
+    "wavesexchange_loaders",
 ]
