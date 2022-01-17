@@ -1,5 +1,4 @@
 use self::dto::*;
-use crate::models::DataEntry;
 use crate::{BaseApi, Error, HttpClient};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use wavesexchange_log::debug;
@@ -119,8 +118,15 @@ impl HttpClient<StateSvcApi> {
 }
 
 pub mod dto {
-    use crate::models::DataEntry;
+    use crate::models::DataEntryValue;
     use serde::Deserialize;
+
+    #[derive(Debug, Clone, Deserialize)]
+    pub struct DataEntry {
+        pub key: String,
+        pub value: DataEntryValue,
+        pub address: String,
+    }
 
     #[derive(Debug, Deserialize)]
     pub(super) struct StateSearchResult {

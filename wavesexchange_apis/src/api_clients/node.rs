@@ -1,5 +1,5 @@
 use self::dto::*;
-use crate::models::{DataEntry, DataEntryValue};
+use crate::models::DataEntryValue;
 use crate::{BaseApi, Error, HttpClient};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -178,6 +178,12 @@ pub mod dto {
         pub keys: Vec<String>,
     }
 
+    #[derive(Debug, Clone, Deserialize)]
+    pub struct DataEntry {
+        pub key: String,
+        pub value: DataEntryValue,
+    }
+
     #[derive(Debug, Deserialize)]
     #[serde(tag = "type")]
     pub(super) enum DataEntryResponse {
@@ -214,7 +220,7 @@ pub mod tests {
     use crate::tests::blockchains::MAINNET;
 
     pub fn mainnet_client() -> HttpClient<NodeApi> {
-        HttpClient::from_base_url(MAINNET::state_service_url)
+        HttpClient::from_base_url(MAINNET::node_url)
     }
 }
 

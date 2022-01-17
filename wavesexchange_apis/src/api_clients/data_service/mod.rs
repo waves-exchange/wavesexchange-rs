@@ -146,7 +146,7 @@ pub mod tests {
     use crate::tests::blockchains::MAINNET;
 
     pub fn mainnet_client() -> HttpClient<DataSvcApi> {
-        HttpClient::from_base_url(MAINNET::state_service_url)
+        HttpClient::from_base_url(MAINNET::data_service_url)
     }
 }
 
