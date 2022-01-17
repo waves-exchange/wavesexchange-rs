@@ -151,7 +151,7 @@ pub mod tests {
 }
 
 #[cfg(test)]
-pub mod tests_internal {
+mod tests_internal {
     use super::tests::*;
     use super::*;
     use crate::tests::blockchains::MAINNET;
