@@ -1,7 +1,9 @@
 use self::dto::*;
 use crate::{BaseApi, Error, HttpClient};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use wavesexchange_log::debug;
+use serde_json::json;
+use std::time::Instant;
+use wavesexchange_log::{debug, info};
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -84,36 +86,57 @@ impl HttpClient<StateSvcApi> {
         &self,
         query: impl Into<serde_json::Value> + Send,
     ) -> Result<Vec<DataEntry>, Error> {
-        let req_start_time = chrono::Utc::now();
+        let mut entries = vec![];
+        let limit = 1000;
+        let mut cnt = 0;
 
-        let res: StateSearchResult = self
-            .post("search")
-            .json(&query.into())
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to get data entries from the state-service".to_string(),
-                )
-            })?
-            .json()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json on fetching data entries from the state-service"
-                        .to_string(),
-                )
-            })?;
+        let mut qv: serde_json::Value = query.into();
 
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "state-service search request took {:?}ms",
-            (req_end_time - req_start_time).num_milliseconds()
+        qv["limit"] = json!(limit);
+        qv["offset"] = json!(0);
+
+        let req_start_time = Instant::now();
+        loop {
+            let res: StateSearchResult = self
+                .post("search")
+                .json(&qv)
+                .send()
+                .await
+                .map_err(|err| {
+                    Error::HttpRequestError(
+                        std::sync::Arc::new(err),
+                        "Failed to get data entries from the state-service".to_string(),
+                    )
+                })?
+                .json()
+                .await
+                .map_err(|err| {
+                    Error::HttpRequestError(
+                        std::sync::Arc::new(err),
+                        "Failed to parse json on fetching data entries from the state-service"
+                            .to_string(),
+                    )
+                })?;
+
+            qv.get_mut("offset")
+                .map(|v| *v = (v.as_u64().unwrap() + limit).into());
+            cnt += 1;
+
+            entries.extend(res.entries);
+
+            if !res.has_next_page {
+                break;
+            }
+        }
+
+        let req_end_time = Instant::now();
+        info!(
+            "state search {} requests took {:?} ms",
+            cnt,
+            (req_end_time - req_start_time).as_millis()
         );
 
-        Ok(res.entries)
+        Ok(entries)
     }
 }
 
@@ -131,6 +154,7 @@ pub mod dto {
     #[derive(Debug, Deserialize)]
     pub(super) struct StateSearchResult {
         pub entries: Vec<DataEntry>,
+        pub has_next_page: bool,
     }
 }
 
