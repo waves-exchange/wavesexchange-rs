@@ -9,10 +9,7 @@ pub mod models;
 #[macro_use]
 extern crate async_trait;
 
-pub use clients::{
-    grpc::GrpcClient,
-    http::{ApiBaseUrl, HttpClient},
-};
+pub use clients::{grpc::GrpcClient, http::HttpClient};
 pub use error::Error;
 
 // reexport api traits

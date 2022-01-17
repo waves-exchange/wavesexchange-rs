@@ -1,15 +1,16 @@
-use crate::{ApiBaseUrl, Error, HttpClient};
+use crate::{BaseApi, Error, HttpClient};
 use itertools::join;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use std::sync::Arc;
 use wavesexchange_log::{timer, trace};
 
-#[async_trait]
-pub trait AssetsSvcApi: ApiBaseUrl {
-    async fn get<S, I>(&self, asset_ids: I, height: Option<u32>) -> Result<Vec<AssetInfo>, Error>
-    where
-        S: AsRef<str> + Send,
-        I: IntoIterator<Item = S> + Send;
+#[derive(Clone)]
+pub struct AssetsSvcApi(Box<HttpClient<Self>>);
+
+impl BaseApi for AssetsSvcApi {
+    fn new_http(cli: &HttpClient<Self>) -> Self {
+        AssetsSvcApi(Box::new(cli.clone()))
+    }
 }
 
 pub struct AssetInfo {
@@ -17,14 +18,17 @@ pub struct AssetInfo {
     pub quantity: i64,
 }
 
-#[async_trait]
-impl AssetsSvcApi for HttpClient {
-    async fn get<S, I>(&self, asset_ids: I, height: Option<u32>) -> Result<Vec<AssetInfo>, Error>
+impl AssetsSvcApi {
+    pub async fn get<S, I>(
+        &self,
+        asset_ids: I,
+        height: Option<u32>,
+    ) -> Result<Vec<AssetInfo>, Error>
     where
         S: AsRef<str> + Send,
         I: IntoIterator<Item = S> + Send,
     {
-        let url = build_url(&self.base_url(), asset_ids, height);
+        let url = build_url(&self.0.base_url(), asset_ids, height);
         if url.is_none() {
             return Ok(vec![]);
         }
@@ -34,6 +38,7 @@ impl AssetsSvcApi for HttpClient {
         timer!("AssetService query");
 
         let resp = self
+            .0
             .get_client()
             .get(&url)
             .send()

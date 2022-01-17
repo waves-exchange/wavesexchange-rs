@@ -1,35 +1,15 @@
 mod impls;
 
 use self::dto::*;
-use crate::{ApiBaseUrl, Error};
-use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use crate::{BaseApi, HttpClient};
 
-#[async_trait]
-pub trait DataSvcApi: ApiBaseUrl {
-    async fn rates<S: Into<String>, I: IntoIterator<Item = (S, S)> + Send, S1: AsRef<str> + Send>(
-        &self,
-        matcher_address: S1,
-        pairs: I,
-        timestamp: Option<NaiveDateTime>,
-    ) -> Result<Vec<Option<f64>>, Error>;
+#[derive(Clone)]
+pub struct DataSvcApi(Box<HttpClient<Self>>);
 
-    // todo proper interface
-    async fn invoke_script_transactions(
-        &self,
-        dapp: impl AsRef<str> + Send + 'async_trait,
-        function: impl AsRef<str> + Send + 'async_trait,
-        timestamp_lt: impl Into<NaiveDateTime> + Send + 'async_trait,
-        // timestamp_gte: NaiveDateTime, todo
-        sort: Sort,
-        limit: usize,
-    ) -> Result<List<InvokeScriptTransaction>, Error>;
-
-    async fn last_exchange_transaction_to_date(
-        &self,
-        sender: impl AsRef<str> + Send + 'async_trait,
-        timestamp: impl Into<NaiveDateTime> + Send + 'async_trait,
-    ) -> Result<Option<GenericTransaction>, Error>;
+impl BaseApi for DataSvcApi {
+    fn new_http(cli: &HttpClient<Self>) -> Self {
+        DataSvcApi(Box::new(cli.clone()))
+    }
 }
 
 pub mod dto {
@@ -174,7 +154,7 @@ pub mod tests {
     const BTC: &str = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS";
     const NON_TRADABLE_ASSET: &str = "Ej5j5kr1hA4MmdKnewGgG7tJbiHFzotU2x2LELzHjW4o";
 
-    pub fn mainnet_client() -> HttpClient {
+    pub fn mainnet_client() -> HttpClient<DataSvcApi> {
         HttpClient::from_base_url(MAINNET::data_service_url)
     }
 

@@ -2,8 +2,7 @@ use super::{
     dto, DataSvcApi, GenericTransaction, InvokeScriptArgument, InvokeScriptCall,
     InvokeScriptTransaction, List, Sort,
 };
-use crate::{Error, HttpClient};
-use async_trait::async_trait;
+use crate::Error;
 use chrono::NaiveDateTime;
 use reqwest::StatusCode;
 use wavesexchange_log::debug;
@@ -11,9 +10,8 @@ use wavesexchange_log::debug;
 const HEADER_ORIGIN_NAME: &str = "Origin";
 const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
 
-#[async_trait]
-impl DataSvcApi for HttpClient {
-    async fn rates<
+impl DataSvcApi {
+    pub async fn rates<
         S: Into<String>,
         I: IntoIterator<Item = (S, S)> + Send,
         S1: AsRef<str> + Send,
@@ -36,6 +34,7 @@ impl DataSvcApi for HttpClient {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
+            .0
             .post(&url)
             .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
             .json(&req)
@@ -88,11 +87,11 @@ impl DataSvcApi for HttpClient {
         }
     }
 
-    async fn invoke_script_transactions(
+    pub async fn invoke_script_transactions(
         &self,
-        dapp: impl AsRef<str> + Send + 'async_trait,
-        function: impl AsRef<str> + Send + 'async_trait,
-        timestamp_lt: impl Into<NaiveDateTime> + Send + 'async_trait,
+        dapp: impl AsRef<str> + Send,
+        function: impl AsRef<str> + Send,
+        timestamp_lt: impl Into<NaiveDateTime> + Send,
         // timestamp_gte: NaiveDateTime,
         sort: Sort,
         limit: usize,
@@ -109,6 +108,7 @@ impl DataSvcApi for HttpClient {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
+            .0
             .get(&url)
             .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
             .send()
@@ -151,10 +151,10 @@ impl DataSvcApi for HttpClient {
         }
     }
 
-    async fn last_exchange_transaction_to_date(
+    pub async fn last_exchange_transaction_to_date(
         &self,
-        sender: impl AsRef<str> + Send + 'async_trait,
-        timestamp: impl Into<NaiveDateTime> + Send + 'async_trait,
+        sender: impl AsRef<str> + Send,
+        timestamp: impl Into<NaiveDateTime> + Send,
     ) -> Result<Option<GenericTransaction>, Error> {
         let url = format!(
             "transactions/exchange?sender={}&timeEnd={:?}&limit=1",
@@ -165,6 +165,7 @@ impl DataSvcApi for HttpClient {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
+            .0
             .get(&url)
             .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
             .send()

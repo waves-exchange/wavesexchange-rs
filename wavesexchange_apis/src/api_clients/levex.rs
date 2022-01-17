@@ -1,21 +1,25 @@
 use crate::models::assets::{AssetId, LeveragedPairId};
-use crate::{ApiBaseUrl, Error, HttpClient};
+use crate::{BaseApi, Error, HttpClient};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use wavesexchange_log::debug;
 
-#[async_trait]
-pub trait LevexApi: ApiBaseUrl {
-    async fn leveraged_tokens_summary(&self) -> Result<Pairs, Error>;
+#[derive(Clone)]
+pub struct LevexApi(Box<HttpClient<Self>>);
+
+impl BaseApi for LevexApi {
+    fn new_http(cli: &HttpClient<Self>) -> Self {
+        LevexApi(Box::new(cli.clone()))
+    }
 }
 
-#[async_trait]
-impl LevexApi for HttpClient {
-    async fn leveraged_tokens_summary(&self) -> Result<Pairs, Error> {
+impl LevexApi {
+    pub async fn leveraged_tokens_summary(&self) -> Result<Pairs, Error> {
         let req_start_time = chrono::Utc::now();
 
         let resp = self
+            .0
             .get("summary")
             .send()
             .await

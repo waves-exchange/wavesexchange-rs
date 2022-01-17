@@ -1,33 +1,24 @@
 use self::dto::*;
 use crate::models::{DataEntry, DataEntryValue};
-use crate::{ApiBaseUrl, Error, HttpClient};
+use crate::{BaseApi, Error, HttpClient};
 use reqwest::StatusCode;
 use serde_json::json;
 use wavesexchange_log::debug;
 
-#[async_trait]
-pub trait NodeApi: ApiBaseUrl {
-    async fn data_entries(
-        &self,
-        address: impl AsRef<str> + Send + 'async_trait,
-        keys: impl IntoIterator<Item = impl Into<String> + 'async_trait> + Send + 'async_trait,
-    ) -> Result<Vec<DataEntry>, Error>;
+#[derive(Clone)]
+pub struct NodeApi(Box<HttpClient<Self>>);
 
-    async fn evaluate(
-        &self,
-        dapp: impl AsRef<str> + Send + 'async_trait,
-        expression: impl AsRef<str> + Send + 'async_trait,
-    ) -> Result<Value, Error>;
-
-    async fn get_last_height(&self) -> Result<i32, Error>;
+impl BaseApi for NodeApi {
+    fn new_http(cli: &HttpClient<Self>) -> Self {
+        NodeApi(Box::new(cli.clone()))
+    }
 }
 
-#[async_trait]
-impl NodeApi for HttpClient {
-    async fn data_entries(
+impl NodeApi {
+    pub async fn data_entries(
         &self,
-        address: impl AsRef<str> + Send + 'async_trait,
-        keys: impl IntoIterator<Item = impl Into<String>> + Send + 'async_trait,
+        address: impl AsRef<str> + Send,
+        keys: impl IntoIterator<Item = impl Into<String>> + Send,
     ) -> Result<Vec<DataEntry>, Error> {
         let body = StateRequest {
             keys: keys.into_iter().map(Into::into).collect(),
@@ -38,6 +29,7 @@ impl NodeApi for HttpClient {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
+            .0
             .post(&endpoint_url)
             .json(&body)
             .send()
@@ -76,10 +68,10 @@ impl NodeApi for HttpClient {
         }
     }
 
-    async fn evaluate(
+    pub async fn evaluate(
         &self,
-        dapp: impl AsRef<str> + Send + 'async_trait,
-        expression: impl AsRef<str> + Send + 'async_trait,
+        dapp: impl AsRef<str> + Send,
+        expression: impl AsRef<str> + Send,
     ) -> Result<Value, Error> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
@@ -87,6 +79,7 @@ impl NodeApi for HttpClient {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
+            .0
             .post(&endpoint_url)
             .json(&body)
             .send()
@@ -126,8 +119,9 @@ impl NodeApi for HttpClient {
         }
     }
 
-    async fn get_last_height(&self) -> Result<i32, Error> {
+    pub async fn get_last_height(&self) -> Result<i32, Error> {
         let r: LastHeight = self
+            .0
             .get("blocks/height")
             .send()
             .await
@@ -226,7 +220,7 @@ pub mod tests {
     use super::*;
     use crate::tests::blockchains::{MAINNET, TESTNET};
 
-    pub fn mainnet_client() -> HttpClient {
+    pub fn mainnet_client() -> HttpClient<NodeApi> {
         HttpClient::from_base_url(MAINNET::node_url)
     }
 
@@ -248,7 +242,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn evaluate() {
-        let result = HttpClient::from_base_url(TESTNET::node_url)
+        let result = HttpClient::<NodeApi>::from_base_url(TESTNET::node_url)
             .evaluate(
                 &TESTNET::products[0].contract_address,
                 "privateCurrentSysParamsREST(\"5Sh9KghfkZyhjwuodovDhB6PghDUGBHiAPZ4MkrPgKtX\")",

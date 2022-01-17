@@ -1,12 +1,15 @@
+use crate::BaseApi;
 use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder};
+use std::ops::Deref;
 
 #[derive(Clone)]
-pub struct HttpClient {
+pub struct HttpClient<A: BaseApi> {
     base_url: Option<String>,
     client: Client,
+    api: Option<A>,
 }
 
-impl HttpClient {
+impl<A: BaseApi> HttpClient<A> {
     pub fn new() -> Self {
         Self::builder().build()
     }
@@ -39,6 +42,13 @@ impl HttpClient {
     pub fn get_client(&self) -> &Client {
         &self.client
     }
+
+    pub fn base_url(&self) -> String {
+        match &self.base_url {
+            Some(s) => s.clone(),
+            None => String::new(),
+        }
+    }
 }
 
 pub struct HttpClientBuilder {
@@ -64,28 +74,26 @@ impl HttpClientBuilder {
         self
     }
 
-    pub fn try_build(mut self) -> Result<HttpClient, ReqError> {
+    pub fn try_build<A: BaseApi>(mut self) -> Result<HttpClient<A>, ReqError> {
         self.builder = self.builder.pool_max_idle_per_host(1);
-        Ok(HttpClient {
+        let mut client = HttpClient {
             base_url: self.base_url,
             client: self.builder.build()?,
-        })
+            api: None,
+        };
+        client.api = Some(A::new_http(&client));
+        Ok(client)
     }
 
-    pub fn build(self) -> HttpClient {
+    pub fn build<A: BaseApi>(self) -> HttpClient<A> {
         self.try_build().unwrap()
     }
 }
 
-pub trait ApiBaseUrl: Clone + Send + Sync + 'static {
-    fn base_url(&self) -> String;
-}
+impl<A: BaseApi> Deref for HttpClient<A> {
+    type Target = A;
 
-impl ApiBaseUrl for HttpClient {
-    fn base_url(&self) -> String {
-        match &self.base_url {
-            Some(s) => s.clone(),
-            None => String::new(),
-        }
+    fn deref(&self) -> &Self::Target {
+        self.api.as_ref().unwrap()
     }
 }

@@ -1,23 +1,8 @@
 use self::dto::*;
 use crate::models::DataEntry;
-use crate::{ApiBaseUrl, Error, HttpClient};
+use crate::{BaseApi, Error, HttpClient};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use wavesexchange_log::debug;
-
-#[async_trait]
-pub trait StateSvcApi: ApiBaseUrl {
-    async fn get(
-        &self,
-        address: impl AsRef<str> + Send + 'async_trait,
-        key: impl AsRef<str> + Send + 'async_trait,
-        history_peg: Option<HistoryPeg>,
-    ) -> Result<Option<DataEntry>, Error>;
-
-    async fn search(
-        &self,
-        query: impl Into<serde_json::Value> + Send + 'async_trait,
-    ) -> Result<Vec<DataEntry>, Error>;
-}
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -26,12 +11,20 @@ pub enum HistoryPeg {
     Timestamp(String),
 }
 
-#[async_trait]
-impl StateSvcApi for HttpClient {
-    async fn get(
+#[derive(Clone)]
+pub struct StateSvcApi(Box<HttpClient<Self>>);
+
+impl BaseApi for StateSvcApi {
+    fn new_http(cli: &HttpClient<Self>) -> Self {
+        StateSvcApi(Box::new(cli.clone()))
+    }
+}
+
+impl StateSvcApi {
+    pub async fn get(
         &self,
-        address: impl AsRef<str> + Send + 'async_trait,
-        key: impl AsRef<str> + Send + 'async_trait,
+        address: impl AsRef<str>,
+        key: impl AsRef<str>,
         history_peg: Option<HistoryPeg>,
     ) -> Result<Option<DataEntry>, Error> {
         let key_encoded = utf8_percent_encode(key.as_ref(), NON_ALPHANUMERIC);
@@ -59,7 +52,7 @@ impl StateSvcApi for HttpClient {
 
         let req_start_time = chrono::Utc::now();
 
-        let res = self.get(&url).send().await.map_err(|err| {
+        let res = self.0.get(&url).send().await.map_err(|err| {
             Error::HttpRequestError(
                 std::sync::Arc::new(err),
                 "Failed to get data entries from the state-service".to_string(),
@@ -92,13 +85,14 @@ impl StateSvcApi for HttpClient {
         }
     }
 
-    async fn search(
+    pub async fn search(
         &self,
-        query: impl Into<serde_json::Value> + Send + 'async_trait,
+        query: impl Into<serde_json::Value> + Send,
     ) -> Result<Vec<DataEntry>, Error> {
         let req_start_time = chrono::Utc::now();
 
         let res: StateSearchResult = self
+            .0
             .post("search")
             .json(&query.into())
             .send()
@@ -145,7 +139,7 @@ pub mod tests {
     use crate::tests::blockchains::MAINNET;
     use serde_json::json;
 
-    pub fn mainnet_client() -> HttpClient {
+    pub fn mainnet_client() -> HttpClient<StateSvcApi> {
         HttpClient::from_base_url(MAINNET::state_service_url)
     }
 

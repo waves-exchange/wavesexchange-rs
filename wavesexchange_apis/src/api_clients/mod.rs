@@ -11,3 +11,9 @@ pub use data_service::DataSvcApi;
 pub use levex::LevexApi;
 pub use node::NodeApi;
 pub use state_service::StateSvcApi;
+
+use crate::HttpClient;
+
+pub trait BaseApi: Clone {
+    fn new_http(cli: &HttpClient<Self>) -> Self;
+}
