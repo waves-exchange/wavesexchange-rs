@@ -19,7 +19,7 @@ pub struct AssetInfo {
 }
 
 impl AssetsSvcApi {
-    pub async fn get<S, I>(
+    pub async fn get_assets<S, I>(
         &self,
         asset_ids: I,
         height: Option<u32>,

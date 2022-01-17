@@ -21,7 +21,7 @@ impl BaseApi for StateSvcApi {
 }
 
 impl StateSvcApi {
-    pub async fn get(
+    pub async fn get_state(
         &self,
         address: impl AsRef<str>,
         key: impl AsRef<str>,
