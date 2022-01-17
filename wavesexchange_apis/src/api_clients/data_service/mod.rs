@@ -140,19 +140,26 @@ pub struct GenericTransaction {
     pub height: u32,
 }
 
-#[cfg(test)]
+// public exports for tests
 pub mod tests {
     use super::*;
-    use crate::{tests::blockchains::MAINNET, HttpClient};
+    use crate::tests::blockchains::MAINNET;
+
+    pub fn mainnet_client() -> HttpClient<DataSvcApi> {
+        HttpClient::from_base_url(MAINNET::state_service_url)
+    }
+}
+
+#[cfg(test)]
+pub mod tests_internal {
+    use super::tests::*;
+    use super::*;
+    use crate::tests::blockchains::MAINNET;
     use chrono::NaiveDate;
 
     const WAVES: &str = "WAVES";
     const BTC: &str = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS";
     const NON_TRADABLE_ASSET: &str = "Ej5j5kr1hA4MmdKnewGgG7tJbiHFzotU2x2LELzHjW4o";
-
-    pub fn mainnet_client() -> HttpClient<DataSvcApi> {
-        HttpClient::from_base_url(MAINNET::data_service_url)
-    }
 
     #[tokio::test]
     async fn fetch_rates_batch_from_data_service() {

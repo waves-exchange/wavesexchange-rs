@@ -128,15 +128,20 @@ pub mod dto {
     }
 }
 
-#[cfg(test)]
+// public exports for tests
 pub mod tests {
     use super::*;
     use crate::tests::blockchains::MAINNET;
-    use serde_json::json;
 
     pub fn mainnet_client() -> HttpClient<StateSvcApi> {
         HttpClient::from_base_url(MAINNET::state_service_url)
     }
+}
+
+#[cfg(test)]
+mod tests_internal {
+    use super::tests::*;
+    use serde_json::json;
 
     #[tokio::test]
     async fn single_asset_price_request() {

@@ -208,14 +208,21 @@ pub mod dto {
     }
 }
 
-#[cfg(test)]
+// public exports for tests
 pub mod tests {
     use super::*;
-    use crate::tests::blockchains::{MAINNET, TESTNET};
+    use crate::tests::blockchains::MAINNET;
 
     pub fn mainnet_client() -> HttpClient<NodeApi> {
-        HttpClient::from_base_url(MAINNET::node_url)
+        HttpClient::from_base_url(MAINNET::state_service_url)
     }
+}
+
+#[cfg(test)]
+pub mod tests_internal {
+    use super::tests::*;
+    use super::*;
+    use crate::tests::blockchains::{MAINNET, TESTNET};
 
     #[tokio::test]
     async fn data_entries() {
