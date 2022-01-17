@@ -6,20 +6,15 @@ use std::str::FromStr;
 use wavesexchange_log::debug;
 
 #[derive(Clone)]
-pub struct LevexApi(Box<HttpClient<Self>>);
+pub struct LevexApi;
 
-impl BaseApi<HttpClient<Self>> for LevexApi {
-    fn new(cli: &HttpClient<Self>) -> Self {
-        LevexApi(Box::new(cli.clone()))
-    }
-}
+impl BaseApi for LevexApi {}
 
-impl LevexApi {
+impl HttpClient<LevexApi> {
     pub async fn leveraged_tokens_summary(&self) -> Result<Pairs, Error> {
         let req_start_time = chrono::Utc::now();
 
         let resp = self
-            .0
             .get("summary")
             .send()
             .await

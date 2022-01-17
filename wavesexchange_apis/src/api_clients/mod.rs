@@ -12,8 +12,4 @@ pub use levex::LevexApi;
 pub use node::NodeApi;
 pub use state_service::StateSvcApi;
 
-use crate::clients::ApiClient;
-
-pub trait BaseApi<C: ApiClient>: Clone {
-    fn new(cli: &C) -> Self;
-}
+pub trait BaseApi: Clone {}

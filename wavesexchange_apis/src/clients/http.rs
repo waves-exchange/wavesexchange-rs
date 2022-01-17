@@ -1,15 +1,15 @@
 use crate::BaseApi;
 use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder};
-use std::{marker::PhantomData, ops::Deref};
+use std::marker::PhantomData;
 
 #[derive(Clone)]
-pub struct HttpClient<A: BaseApi<Self>> {
+pub struct HttpClient<A: BaseApi> {
     base_url: Option<String>,
     client: Client,
-    api: Option<A>,
+    _pd: PhantomData<A>,
 }
 
-impl<A: BaseApi<Self>> HttpClient<A> {
+impl<A: BaseApi> HttpClient<A> {
     pub fn new() -> Self {
         Self::builder().build()
     }
@@ -51,13 +51,13 @@ impl<A: BaseApi<Self>> HttpClient<A> {
     }
 }
 
-pub struct HttpClientBuilder<A: BaseApi<HttpClient<A>>> {
+pub struct HttpClientBuilder<A: BaseApi> {
     base_url: Option<String>,
     builder: ClientBuilder,
     _pd: PhantomData<A>,
 }
 
-impl<A: BaseApi<HttpClient<A>>> HttpClientBuilder<A> {
+impl<A: BaseApi> HttpClientBuilder<A> {
     pub fn new() -> Self {
         HttpClientBuilder {
             base_url: None,
@@ -78,24 +78,14 @@ impl<A: BaseApi<HttpClient<A>>> HttpClientBuilder<A> {
 
     pub fn try_build(mut self) -> Result<HttpClient<A>, ReqError> {
         self.builder = self.builder.pool_max_idle_per_host(1);
-        let mut client = HttpClient {
+        Ok(HttpClient {
             base_url: self.base_url,
             client: self.builder.build()?,
-            api: None,
-        };
-        client.api = Some(A::new(&client));
-        Ok(client)
+            _pd: PhantomData,
+        })
     }
 
     pub fn build(self) -> HttpClient<A> {
         self.try_build().unwrap()
-    }
-}
-
-impl<A: BaseApi<Self>> Deref for HttpClient<A> {
-    type Target = A;
-
-    fn deref(&self) -> &Self::Target {
-        self.api.as_ref().unwrap()
     }
 }

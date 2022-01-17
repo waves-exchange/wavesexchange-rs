@@ -5,20 +5,16 @@ use std::sync::Arc;
 use wavesexchange_log::{timer, trace};
 
 #[derive(Clone)]
-pub struct AssetsSvcApi(Box<HttpClient<Self>>);
+pub struct AssetsSvcApi;
 
-impl BaseApi<HttpClient<Self>> for AssetsSvcApi {
-    fn new(cli: &HttpClient<Self>) -> Self {
-        AssetsSvcApi(Box::new(cli.clone()))
-    }
-}
+impl BaseApi for AssetsSvcApi {}
 
 pub struct AssetInfo {
     pub id: String,
     pub quantity: i64,
 }
 
-impl AssetsSvcApi {
+impl HttpClient<AssetsSvcApi> {
     pub async fn get_assets<S, I>(
         &self,
         asset_ids: I,
@@ -28,7 +24,7 @@ impl AssetsSvcApi {
         S: AsRef<str> + Send,
         I: IntoIterator<Item = S> + Send,
     {
-        let url = build_url(&self.0.base_url(), asset_ids, height);
+        let url = build_url(&self.base_url(), asset_ids, height);
         if url.is_none() {
             return Ok(vec![]);
         }
@@ -38,7 +34,6 @@ impl AssetsSvcApi {
         timer!("AssetService query");
 
         let resp = self
-            .0
             .get_client()
             .get(&url)
             .send()

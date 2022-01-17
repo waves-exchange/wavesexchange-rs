@@ -6,11 +6,7 @@ use crate::{BaseApi, HttpClient};
 #[derive(Clone)]
 pub struct DataSvcApi(Box<HttpClient<Self>>);
 
-impl BaseApi<HttpClient<Self>> for DataSvcApi {
-    fn new(cli: &HttpClient<Self>) -> Self {
-        DataSvcApi(Box::new(cli.clone()))
-    }
-}
+impl BaseApi for DataSvcApi {}
 
 pub mod dto {
     use chrono::NaiveDateTime;

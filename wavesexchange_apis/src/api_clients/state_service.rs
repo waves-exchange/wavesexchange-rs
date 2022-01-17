@@ -12,15 +12,11 @@ pub enum HistoryPeg {
 }
 
 #[derive(Clone)]
-pub struct StateSvcApi(Box<HttpClient<Self>>);
+pub struct StateSvcApi;
 
-impl BaseApi<HttpClient<Self>> for StateSvcApi {
-    fn new(cli: &HttpClient<Self>) -> Self {
-        StateSvcApi(Box::new(cli.clone()))
-    }
-}
+impl BaseApi for StateSvcApi {}
 
-impl StateSvcApi {
+impl HttpClient<StateSvcApi> {
     pub async fn get_state(
         &self,
         address: impl AsRef<str>,
@@ -52,7 +48,7 @@ impl StateSvcApi {
 
         let req_start_time = chrono::Utc::now();
 
-        let res = self.0.get(&url).send().await.map_err(|err| {
+        let res = self.get(&url).send().await.map_err(|err| {
             Error::HttpRequestError(
                 std::sync::Arc::new(err),
                 "Failed to get data entries from the state-service".to_string(),
@@ -92,7 +88,6 @@ impl StateSvcApi {
         let req_start_time = chrono::Utc::now();
 
         let res: StateSearchResult = self
-            .0
             .post("search")
             .json(&query.into())
             .send()

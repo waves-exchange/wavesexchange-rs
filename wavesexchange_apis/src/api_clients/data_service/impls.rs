@@ -2,7 +2,7 @@ use super::{
     dto, DataSvcApi, GenericTransaction, InvokeScriptArgument, InvokeScriptCall,
     InvokeScriptTransaction, List, Sort,
 };
-use crate::Error;
+use crate::{Error, HttpClient};
 use chrono::NaiveDateTime;
 use reqwest::StatusCode;
 use wavesexchange_log::debug;
@@ -10,7 +10,7 @@ use wavesexchange_log::debug;
 const HEADER_ORIGIN_NAME: &str = "Origin";
 const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
 
-impl DataSvcApi {
+impl HttpClient<DataSvcApi> {
     pub async fn rates<
         S: Into<String>,
         I: IntoIterator<Item = (S, S)> + Send,
@@ -34,7 +34,6 @@ impl DataSvcApi {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
-            .0
             .post(&url)
             .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
             .json(&req)
@@ -108,7 +107,6 @@ impl DataSvcApi {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
-            .0
             .get(&url)
             .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
             .send()
@@ -165,7 +163,6 @@ impl DataSvcApi {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
-            .0
             .get(&url)
             .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
             .send()

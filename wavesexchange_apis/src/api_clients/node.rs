@@ -6,15 +6,11 @@ use serde_json::json;
 use wavesexchange_log::debug;
 
 #[derive(Clone)]
-pub struct NodeApi(Box<HttpClient<Self>>);
+pub struct NodeApi;
 
-impl BaseApi<HttpClient<Self>> for NodeApi {
-    fn new(cli: &HttpClient<Self>) -> Self {
-        NodeApi(Box::new(cli.clone()))
-    }
-}
+impl BaseApi for NodeApi {}
 
-impl NodeApi {
+impl HttpClient<NodeApi> {
     pub async fn data_entries(
         &self,
         address: impl AsRef<str> + Send,
@@ -29,7 +25,6 @@ impl NodeApi {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
-            .0
             .post(&endpoint_url)
             .json(&body)
             .send()
@@ -79,7 +74,6 @@ impl NodeApi {
         let req_start_time = chrono::Utc::now();
 
         let resp_raw = self
-            .0
             .post(&endpoint_url)
             .json(&body)
             .send()
@@ -121,7 +115,6 @@ impl NodeApi {
 
     pub async fn get_last_height(&self) -> Result<i32, Error> {
         let r: LastHeight = self
-            .0
             .get("blocks/height")
             .send()
             .await

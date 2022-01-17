@@ -13,15 +13,11 @@ use waves_protobuf_schemas::waves::events::{
 };
 
 #[derive(Clone)]
-pub struct BlockchainUpdApi(Box<GrpcClient<Self>>);
+pub struct BlockchainUpdApi;
 
-impl BaseApi<GrpcClient<Self>> for BlockchainUpdApi {
-    fn new(cli: &GrpcClient<Self>) -> Self {
-        BlockchainUpdApi(Box::new(cli.clone()))
-    }
-}
+impl BaseApi for BlockchainUpdApi {}
 
-impl BlockchainUpdApi {
+impl GrpcClient<BlockchainUpdApi> {
     pub async fn fetch_transactions_at_height(
         &mut self,
         height: u32,
@@ -30,8 +26,7 @@ impl BlockchainUpdApi {
             height: height as i32,
         });
 
-        self.0
-            .grpc_client
+        self.grpc_client
             .get_block_update(request)
             .await
             .map_err(Arc::new)?
