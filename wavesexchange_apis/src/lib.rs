@@ -8,5 +8,5 @@ pub mod models;
 pub use clients::{grpc::GrpcClient, http::HttpClient};
 pub use error::Error;
 
-// reexport api traits
+// reexport api structs
 pub use api_clients::*;

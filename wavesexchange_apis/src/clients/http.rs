@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 #[derive(Clone)]
 pub struct HttpClient<A: BaseApi> {
     base_url: Option<String>,
-    client: Client,
+    inner_client: Client,
     _pd: PhantomData<A>,
 }
 
@@ -30,17 +30,17 @@ impl<A: BaseApi> HttpClient<A> {
     }
 
     pub fn get(&self, url: impl Into<String>) -> RequestBuilder {
-        self.client.get(self.prepare_url(url))
+        self.inner_client.get(self.prepare_url(url))
     }
 
     pub fn post(&self, url: impl Into<String>) -> RequestBuilder {
-        self.client.post(self.prepare_url(url))
+        self.inner_client.post(self.prepare_url(url))
     }
 
     /// `self.client` is private to prevent ambiguation in `self.get` vs `self.client.get`
     /// so use this if you really need inner reqwest::Client
     pub fn get_client(&self) -> &Client {
-        &self.client
+        &self.inner_client
     }
 
     pub fn base_url(&self) -> String {
@@ -80,7 +80,7 @@ impl<A: BaseApi> HttpClientBuilder<A> {
         self.builder = self.builder.pool_max_idle_per_host(1);
         Ok(HttpClient {
             base_url: self.base_url,
-            client: self.builder.build()?,
+            inner_client: self.builder.build()?,
             _pd: PhantomData,
         })
     }
