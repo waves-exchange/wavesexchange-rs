@@ -19,7 +19,7 @@ impl BaseApi for BlockchainUpdApi {}
 
 impl GrpcClient<BlockchainUpdApi> {
     pub async fn fetch_transactions_at_height(
-        &mut self,
+        &self,
         height: u32,
     ) -> Result<TransactionsAtHeight, Error> {
         let request = tonic::Request::new(GetBlockUpdateRequest {
@@ -27,6 +27,7 @@ impl GrpcClient<BlockchainUpdApi> {
         });
 
         self.grpc_client
+            .clone()
             .get_block_update(request)
             .await
             .map_err(Arc::new)?
