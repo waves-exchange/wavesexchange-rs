@@ -3,13 +3,13 @@ use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder};
 use std::{marker::PhantomData, ops::Deref};
 
 #[derive(Clone)]
-pub struct HttpClient<A: BaseApi> {
+pub struct HttpClient<A: BaseApi<Self>> {
     base_url: Option<String>,
     client: Client,
     api: Option<A>,
 }
 
-impl<A: BaseApi> HttpClient<A> {
+impl<A: BaseApi<Self>> HttpClient<A> {
     pub fn new() -> Self {
         Self::builder().build()
     }
@@ -51,13 +51,13 @@ impl<A: BaseApi> HttpClient<A> {
     }
 }
 
-pub struct HttpClientBuilder<A: BaseApi> {
+pub struct HttpClientBuilder<A: BaseApi<HttpClient<A>>> {
     base_url: Option<String>,
     builder: ClientBuilder,
     _pd: PhantomData<A>,
 }
 
-impl<A: BaseApi> HttpClientBuilder<A> {
+impl<A: BaseApi<HttpClient<A>>> HttpClientBuilder<A> {
     pub fn new() -> Self {
         HttpClientBuilder {
             base_url: None,
@@ -83,7 +83,7 @@ impl<A: BaseApi> HttpClientBuilder<A> {
             client: self.builder.build()?,
             api: None,
         };
-        client.api = Some(A::new_http(&client));
+        client.api = Some(A::new(&client));
         Ok(client)
     }
 
@@ -92,7 +92,7 @@ impl<A: BaseApi> HttpClientBuilder<A> {
     }
 }
 
-impl<A: BaseApi> Deref for HttpClient<A> {
+impl<A: BaseApi<Self>> Deref for HttpClient<A> {
     type Target = A;
 
     fn deref(&self) -> &Self::Target {

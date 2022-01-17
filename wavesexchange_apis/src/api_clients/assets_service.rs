@@ -7,8 +7,8 @@ use wavesexchange_log::{timer, trace};
 #[derive(Clone)]
 pub struct AssetsSvcApi(Box<HttpClient<Self>>);
 
-impl BaseApi for AssetsSvcApi {
-    fn new_http(cli: &HttpClient<Self>) -> Self {
+impl BaseApi<HttpClient<Self>> for AssetsSvcApi {
+    fn new(cli: &HttpClient<Self>) -> Self {
         AssetsSvcApi(Box::new(cli.clone()))
     }
 }

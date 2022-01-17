@@ -14,8 +14,8 @@ pub enum HistoryPeg {
 #[derive(Clone)]
 pub struct StateSvcApi(Box<HttpClient<Self>>);
 
-impl BaseApi for StateSvcApi {
-    fn new_http(cli: &HttpClient<Self>) -> Self {
+impl BaseApi<HttpClient<Self>> for StateSvcApi {
+    fn new(cli: &HttpClient<Self>) -> Self {
         StateSvcApi(Box::new(cli.clone()))
     }
 }

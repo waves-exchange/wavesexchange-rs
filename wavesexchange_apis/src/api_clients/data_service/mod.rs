@@ -6,8 +6,8 @@ use crate::{BaseApi, HttpClient};
 #[derive(Clone)]
 pub struct DataSvcApi(Box<HttpClient<Self>>);
 
-impl BaseApi for DataSvcApi {
-    fn new_http(cli: &HttpClient<Self>) -> Self {
+impl BaseApi<HttpClient<Self>> for DataSvcApi {
+    fn new(cli: &HttpClient<Self>) -> Self {
         DataSvcApi(Box::new(cli.clone()))
     }
 }

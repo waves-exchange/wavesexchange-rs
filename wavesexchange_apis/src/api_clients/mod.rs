@@ -6,14 +6,14 @@ pub mod node;
 pub mod state_service;
 
 pub use assets_service::AssetsSvcApi;
-pub use blockchain_updates::BlockchainUpdatesApi;
+pub use blockchain_updates::BlockchainUpdApi;
 pub use data_service::DataSvcApi;
 pub use levex::LevexApi;
 pub use node::NodeApi;
 pub use state_service::StateSvcApi;
 
-use crate::HttpClient;
+use crate::clients::ApiClient;
 
-pub trait BaseApi: Clone {
-    fn new_http(cli: &HttpClient<Self>) -> Self;
+pub trait BaseApi<C: ApiClient>: Clone {
+    fn new(cli: &C) -> Self;
 }

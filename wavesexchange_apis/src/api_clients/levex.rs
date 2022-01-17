@@ -8,8 +8,8 @@ use wavesexchange_log::debug;
 #[derive(Clone)]
 pub struct LevexApi(Box<HttpClient<Self>>);
 
-impl BaseApi for LevexApi {
-    fn new_http(cli: &HttpClient<Self>) -> Self {
+impl BaseApi<HttpClient<Self>> for LevexApi {
+    fn new(cli: &HttpClient<Self>) -> Self {
         LevexApi(Box::new(cli.clone()))
     }
 }

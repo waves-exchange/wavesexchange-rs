@@ -8,8 +8,8 @@ use wavesexchange_log::debug;
 #[derive(Clone)]
 pub struct NodeApi(Box<HttpClient<Self>>);
 
-impl BaseApi for NodeApi {
-    fn new_http(cli: &HttpClient<Self>) -> Self {
+impl BaseApi<HttpClient<Self>> for NodeApi {
+    fn new(cli: &HttpClient<Self>) -> Self {
         NodeApi(Box::new(cli.clone()))
     }
 }
