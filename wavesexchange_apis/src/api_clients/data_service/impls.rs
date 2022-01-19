@@ -4,7 +4,6 @@ use super::{
 };
 use crate::{Error, HttpClient};
 use chrono::NaiveDateTime;
-use reqwest::StatusCode;
 use wavesexchange_log::debug;
 
 const HEADER_ORIGIN_NAME: &str = "Origin";
@@ -31,59 +30,27 @@ impl HttpClient<DataSvcApi> {
 
         let url = format!("matchers/{}/rates", matcher_address.as_ref());
 
-        let req_start_time = chrono::Utc::now();
+        let resp: dto::RatesResponse = self
+            .create_req_handler(
+                self.post(&url)
+                    .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
+                    .json(&req),
+                "data_service::rates",
+            )
+            .execute()
+            .await?;
 
-        let resp_raw = self
-            .post(&url)
-            .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
-            .json(&req)
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    format!("POST {} | data service rates fetch", url),
-                )
-            })?;
-
-        let resp_status = resp_raw.status();
-
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "data-service rates request took {:?}ms, status: {}",
-            (req_end_time - req_start_time).num_milliseconds(),
-            resp_status,
-        );
-
-        if resp_status == StatusCode::OK {
-            let resp: dto::RatesResponse = resp_raw.json().await.map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    format!(
-                        "POST {} | Status: {:?} | data service rates json parse",
-                        url, resp_status
-                    ),
-                )
-            })?;
-
-            Ok(resp
-                .data
-                .into_iter()
-                .map(|r| {
-                    if r.data.rate == 0.0 {
-                        None
-                    } else {
-                        Some(r.data.rate)
-                    }
-                })
-                .collect())
-        } else {
-            let body = resp_raw.text().await.unwrap_or_else(|_| "".to_owned());
-            Err(Error::InvalidStatus(
-                    resp_status,
-                    format!("Upstream API error while fetching rates from data-service. Status {:?}, body: {}", resp_status, body)
-                ))
-        }
+        Ok(resp
+            .data
+            .into_iter()
+            .map(|r| {
+                if r.data.rate == 0.0 {
+                    None
+                } else {
+                    Some(r.data.rate)
+                }
+            })
+            .collect())
     }
 
     pub async fn invoke_script_transactions(
@@ -104,49 +71,22 @@ impl HttpClient<DataSvcApi> {
             limit,
         );
 
-        let req_start_time = chrono::Utc::now();
+        let resp: List<dto::InvokeScriptTransactionResponse> = self
+            .create_req_handler(
+                self.get(&url)
+                    .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
+                "data_service::invoke_script_transactions",
+            )
+            .execute()
+            .await?;
 
-        let resp_raw = self
-            .get(&url)
-            .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
-            .send()
-            .await
-            .map_err(|e| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(e),
-                    "Failed to fetch invokes from data-service".to_string(),
-                )
-            })?;
+        let list: List<InvokeScriptTransaction> = List {
+            data: resp.data.into_iter().map(Into::into).collect(),
+            last_cursor: resp.last_cursor,
+            is_last_page: resp.is_last_page,
+        };
 
-        let resp_status = resp_raw.status();
-
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "data-service invoke_script_transactions request took {:?}ms, status: {}",
-            (req_end_time - req_start_time).num_milliseconds(),
-            resp_status,
-        );
-
-        if resp_status == StatusCode::OK {
-            let resp: List<dto::InvokeScriptTransactionResponse> = resp_raw.json().await.map_err(|err| Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    format!("Failed to parse json while fetching invokes from the data-service on status {:?}", resp_status)
-                ))?;
-
-            let list: List<InvokeScriptTransaction> = List {
-                data: resp.data.into_iter().map(Into::into).collect(),
-                last_cursor: resp.last_cursor,
-                is_last_page: resp.is_last_page,
-            };
-
-            Ok(list)
-        } else {
-            let body = resp_raw.text().await.unwrap_or_else(|_| "".to_owned());
-            Err(Error::InvalidStatus(
-                    resp_status,
-                    format!("Upstream API error while fetching invokes from data-service. Status {:?}, body: {}", resp_status, body)
-                ))
-        }
+        Ok(list)
     }
 
     pub async fn last_exchange_transaction_to_date(
@@ -160,64 +100,37 @@ impl HttpClient<DataSvcApi> {
             timestamp.into(),
         );
 
-        let req_start_time = chrono::Utc::now();
+        let resp: List<dto::GenericTransactionResponse> = self
+            .create_req_handler(
+                self.get(&url)
+                    .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
+                "data_service::last_exchange_transaction_to_date",
+            )
+            .execute()
+            .await?;
 
-        let resp_raw = self
-            .get(&url)
-            .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE)
-            .send()
-            .await
-            .map_err(|e| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(e),
-                    "Failed to fetch last exchange transaction from data-service".to_string(),
-                )
-            })?;
+        if resp.data.is_empty() {
+            debug!(
+                "Data service: no transactions found for sender={}",
+                sender.as_ref()
+            );
+            return Ok(None);
+        }
 
-        let resp_status = resp_raw.status();
+        let list: List<GenericTransaction> = List {
+            data: resp.data.into_iter().map(Into::into).collect(),
+            last_cursor: resp.last_cursor,
+            is_last_page: resp.is_last_page,
+        };
 
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "data-service last_exchange_transaction_to_date request took {:?}ms, status: {}",
-            (req_end_time - req_start_time).num_milliseconds(),
-            resp_status,
-        );
-
-        if resp_status == StatusCode::OK {
-            let resp: List<dto::GenericTransactionResponse> = resp_raw.json().await.map_err(|err| Error::HttpRequestError(
-                std::sync::Arc::new(err),
-                format!("Failed to parse json while fetching last exchange transaction from the data-service on status {:?}", resp_status)
-            ))?;
-
-            if resp.data.is_empty() {
-                debug!(
-                    "Data service: no transactions found for sender={}",
-                    sender.as_ref()
-                );
-                return Ok(None);
-            }
-
-            let list: List<GenericTransaction> = List {
-                data: resp.data.into_iter().map(Into::into).collect(),
-                last_cursor: resp.last_cursor,
-                is_last_page: resp.is_last_page,
-            };
-
-            if list.data.len() == 1 {
-                let trans = list.data.into_iter().next().unwrap();
-                Ok(Some(trans))
-            } else {
-                Err(Error::ResponseParseError(format!(
-                    "Failed to interpret data, expected one transaction, found {}",
-                    list.data.len()
-                )))
-            }
+        if list.data.len() == 1 {
+            let trans = list.data.into_iter().next().unwrap();
+            Ok(Some(trans))
         } else {
-            let body = resp_raw.text().await.unwrap_or_else(|_| "".to_owned());
-            Err(Error::InvalidStatus(
-                resp_status,
-                format!("Upstream API error while fetching last exchange transaction from data-service. Status {:?}, body: {}", resp_status, body)
-            ))
+            Err(Error::ResponseParseError(format!(
+                "Failed to interpret data, expected one transaction, found {}",
+                list.data.len()
+            )))
         }
     }
 }

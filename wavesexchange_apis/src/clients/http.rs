@@ -4,7 +4,7 @@ use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder, Response
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use wavesexchange_log::{debug, trace};
+use wavesexchange_log::debug;
 
 #[derive(Clone)]
 pub struct HttpClient<A: BaseApi> {
@@ -65,7 +65,7 @@ impl<A: BaseApi> HttpClient<A> {
         let url = request.url().as_str();
         let log_method_url = format!("{method} {url}");
 
-        trace!("performing request '{}', url: {}", req_info, log_method_url);
+        debug!("requesting '{}', url: {}", req_info, log_method_url);
 
         let req_start_time = chrono::Utc::now();
         let resp = self
@@ -132,6 +132,20 @@ impl<A: BaseApi> HttpClientBuilder<A> {
     }
 }
 
+#[derive(PartialEq, Eq, Hash)]
+pub enum StatusCodes {
+    Concrete(StatusCode),
+    Other,
+}
+
+impl From<StatusCode> for StatusCodes {
+    fn from(s: StatusCode) -> Self {
+        StatusCodes::Concrete(s)
+    }
+}
+
+type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, Result<T, Error>> + Send>;
+
 /// Optional helper struct for handling requests-responses
 ///
 /// ```no_run
@@ -145,15 +159,6 @@ impl<A: BaseApi> HttpClientBuilder<A> {
 ///     )
 ///     .execute()
 /// ```
-
-#[derive(PartialEq, Eq, Hash)]
-pub enum StatusCodes {
-    Concrete(StatusCode),
-    Other,
-}
-
-type StatusHandler<T> = Box<dyn Fn(Response) -> BoxFuture<'static, Result<T, Error>> + Send>;
-
 pub(crate) struct WXRequestHandler<
     'cli,
     A: BaseApi,
@@ -170,50 +175,54 @@ impl<'cli, A: BaseApi, T: DeserializeOwned, RS: Into<String> + Clone + Send>
     WXRequestHandler<'cli, A, T, RS>
 {
     pub fn from_request(client: &'cli HttpClient<A>, req: RequestBuilder, req_info: RS) -> Self {
-        let mut this = Self {
+        let this = Self {
             client,
             req: Some(req),
             req_info,
             status_handlers: HashMap::new(),
         };
-        this.set_default_handlers();
-        this
+        this.set_default_handlers()
     }
 
     pub fn handle_status_code<Fut>(
-        &mut self,
-        code: StatusCodes,
-        handler: impl Fn(Response) -> Fut + Send + 'static,
-    ) -> &mut Self
+        mut self,
+        code: impl Into<StatusCodes>,
+        handler: impl FnOnce(Response) -> Fut + Send + 'static,
+    ) -> Self
     where
         Fut: Future<Output = Result<T, Error>> + Send + 'static,
     {
         self.status_handlers
-            .insert(code, Box::new(move |resp| Box::pin(handler(resp))));
+            .insert(code.into(), Box::new(move |resp| Box::pin(handler(resp))));
         self
     }
 
-    fn set_default_handlers(&mut self) {
-        let req_info = self.req_info.into();
-        self.handle_status_code(StatusCodes::Concrete(StatusCode::OK), |resp| async {
-            resp.json()
-                .await
-                .map_err(|err| error::json_error(err, req_info.clone()))
-        });
-        self.handle_status_code(StatusCodes::Other, |resp| async {
-            Err(error::invalid_status(resp, req_info).await)
-        });
+    fn set_default_handlers(mut self) -> Self {
+        let req_info = self.req_info.clone().into();
+        self = self.handle_status_code(
+            StatusCodes::Concrete(StatusCode::OK),
+            move |resp| async move {
+                resp.json()
+                    .await
+                    .map_err(|err| error::json_error(err, req_info.clone()))
+            },
+        );
+
+        let req_info = self.req_info.clone().into();
+        self.handle_status_code(StatusCodes::Other, move |resp| async move {
+            Err(error::invalid_status(resp, req_info.clone()).await)
+        })
     }
 
-    pub async fn execute(&mut self) -> Result<T, Error> {
+    pub async fn execute(mut self) -> Result<T, Error> {
         let req = self.req.take().unwrap();
         let req_info = self.req_info.clone().into();
         let resp = self.client.do_request(req, req_info).await?;
         let status = resp.status();
         let handler =
-            if let Some(handler) = self.status_handlers.get(&StatusCodes::Concrete(status)) {
+            if let Some(handler) = self.status_handlers.remove(&StatusCodes::Concrete(status)) {
                 handler
-            } else if let Some(default_handler) = self.status_handlers.get(&StatusCodes::Other) {
+            } else if let Some(default_handler) = self.status_handlers.remove(&StatusCodes::Other) {
                 default_handler
             } else {
                 unreachable!()

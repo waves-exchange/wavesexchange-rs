@@ -3,7 +3,6 @@ use crate::{BaseApi, Error, HttpClient};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
-use wavesexchange_log::debug;
 
 #[derive(Clone)]
 pub struct LevexApi;
@@ -12,33 +11,10 @@ impl BaseApi for LevexApi {}
 
 impl HttpClient<LevexApi> {
     pub async fn leveraged_tokens_summary(&self) -> Result<Pairs, Error> {
-        let req_start_time = chrono::Utc::now();
-
-        let resp = self
-            .get("summary")
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to get leveraged tokens summary from Levex".to_string(),
-                )
-            })?
-            .json::<dto::SummaryResponse>()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json while fetching leveraged tokens summary from Levex"
-                        .to_string(),
-                )
-            })?;
-
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "levex leveraged_tokens_summary request took {:?}ms",
-            (req_end_time - req_start_time).num_milliseconds()
-        );
+        let resp: dto::SummaryResponse = self
+            .create_req_handler(self.get("summary"), "levex::leveraged_tokens_summary")
+            .execute()
+            .await?;
 
         Ok(resp
             .try_into()

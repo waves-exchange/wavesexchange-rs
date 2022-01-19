@@ -21,11 +21,12 @@ pub enum Error {
 
 pub async fn invalid_status(resp: Response, req_info: impl Into<String>) -> Error {
     let status = resp.status();
+    let url = resp.url().to_string();
     let body = resp.text().await.unwrap_or_else(|_| "".to_owned());
     let req_info = req_info.into();
     Error::InvalidStatus(
         status,
-        format!("Upstream API error while fetching request '{req_info}', body: {body}"),
+        format!("Upstream API error while fetching request '{req_info}', url: {url}, body: {body}"),
     )
 }
 

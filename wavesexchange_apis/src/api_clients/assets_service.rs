@@ -1,8 +1,7 @@
 use crate::{BaseApi, Error, HttpClient};
 use itertools::join;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use std::sync::Arc;
-use wavesexchange_log::{timer, trace};
+use wavesexchange_log::timer;
 
 #[derive(Clone)]
 pub struct AssetsSvcApi;
@@ -24,31 +23,17 @@ impl HttpClient<AssetsSvcApi> {
         S: AsRef<str> + Send,
         I: IntoIterator<Item = S> + Send,
     {
-        let url = build_url(&self.base_url(), asset_ids, height);
-        if url.is_none() {
-            return Ok(vec![]);
-        }
-        let url = url.unwrap();
-        trace!("AssetsService url: {}", url);
+        let url = match build_url(&self.base_url(), asset_ids, height) {
+            Some(u) => u,
+            None => return Ok(vec![]),
+        };
 
         timer!("AssetService query");
 
-        let resp = self
-            .get_client()
-            .get(&url)
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(Arc::new(err), "Failed to query Assets Service".to_string())
-            })?
-            .json::<dto::AssetResponse>()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    Arc::new(err),
-                    "Failed to parse json response from Assets Service".to_string(),
-                )
-            })?;
+        let resp: dto::AssetResponse = self
+            .create_req_handler(self.get_client().get(&url), "assets::get_assets")
+            .execute()
+            .await?;
 
         let res = resp
             .data

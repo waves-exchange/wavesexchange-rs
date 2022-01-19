@@ -1,9 +1,10 @@
 use self::dto::*;
 use crate::{BaseApi, Error, HttpClient};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use reqwest::StatusCode;
 use serde_json::json;
 use std::time::Instant;
-use wavesexchange_log::{debug, info};
+use wavesexchange_log::info;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -47,39 +48,10 @@ impl HttpClient<StateSvcApi> {
             }
         };
 
-        let req_start_time = chrono::Utc::now();
-
-        let res = self.get(&url).send().await.map_err(|err| {
-            Error::HttpRequestError(
-                std::sync::Arc::new(err),
-                "Failed to get data entries from the state-service".to_string(),
-            )
-        })?;
-
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "state-service get request took {:?}ms, URL: {}",
-            (req_end_time - req_start_time).num_milliseconds(),
-            url,
-        );
-
-        match res.status() {
-            reqwest::StatusCode::NOT_FOUND => Ok(None),
-            reqwest::StatusCode::OK => Ok(Some(res.json().await.map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json on fetching data entries from the state-service"
-                        .to_string(),
-                )
-            })?)),
-            s => {
-                let body = res.text().await.unwrap_or_else(|_| "".to_owned());
-                Err(Error::InvalidStatus(
-                    s,
-                    format!("State-service GET request failed. Body: {}", body),
-                ))
-            }
-        }
+        self.create_req_handler(self.get(&url), "state::get_state")
+            .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
+            .execute()
+            .await
     }
 
     pub async fn search(
@@ -98,25 +70,9 @@ impl HttpClient<StateSvcApi> {
         let req_start_time = Instant::now();
         loop {
             let res: StateSearchResult = self
-                .post("search")
-                .json(&qv)
-                .send()
-                .await
-                .map_err(|err| {
-                    Error::HttpRequestError(
-                        std::sync::Arc::new(err),
-                        "Failed to get data entries from the state-service".to_string(),
-                    )
-                })?
-                .json()
-                .await
-                .map_err(|err| {
-                    Error::HttpRequestError(
-                        std::sync::Arc::new(err),
-                        "Failed to parse json on fetching data entries from the state-service"
-                            .to_string(),
-                    )
-                })?;
+                .create_req_handler(self.post("search").json(&qv), "state::search")
+                .execute()
+                .await?;
 
             qv.get_mut("offset")
                 .map(|v| *v = (v.as_u64().unwrap() + limit).into());
@@ -162,9 +118,14 @@ pub mod dto {
 pub mod tests {
     use super::*;
     use crate::tests::blockchains::MAINNET;
+    use crate::tests::blockchains::TESTNET;
 
     pub fn mainnet_client() -> HttpClient<StateSvcApi> {
         HttpClient::from_base_url(MAINNET::state_service_url)
+    }
+
+    pub fn testnet_client() -> HttpClient<StateSvcApi> {
+        HttpClient::from_base_url(TESTNET::state_service_url)
     }
 }
 
@@ -172,6 +133,26 @@ pub mod tests {
 mod tests_internal {
     use super::tests::*;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn test_get_state() {
+        let entries = testnet_client()
+            .get_state(
+                "3MrbnZkriTBZhRqS45L1VfCrden6Erpa7To",
+                "%s__priceDecimals",
+                None,
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(entries.key, "%s__priceDecimals");
+
+        let entries_none = testnet_client()
+            .get_state("3MrbnZkriTBZhRqS45L1VfCrden6Erpa7To", "%s__priceDeci", None)
+            .await
+            .unwrap();
+        assert!(entries_none.is_none());
+    }
 
     #[tokio::test]
     async fn single_asset_price_request() {

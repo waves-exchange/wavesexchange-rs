@@ -3,7 +3,6 @@ use bigdecimal::BigDecimal;
 use itertools::Itertools;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
-use wavesexchange_log::debug;
 
 #[derive(Clone)]
 pub struct RatesSvcApi;
@@ -20,7 +19,12 @@ impl HttpClient<RatesSvcApi> {
             .map(|(a, b)| format!("{}/{}", a, b))
             .collect::<Vec<_>>();
 
-        let resp = self.query_rates(pairs).await?;
+        let body = json!({ "pairs": &pairs });
+
+        let resp: dto::RatesResponse = self
+            .create_req_handler(self.post("rates").json(&body), "rates::rates")
+            .execute()
+            .await?;
 
         let res = resp
             .data
@@ -48,7 +52,12 @@ impl HttpClient<RatesSvcApi> {
             .map(|amount_asset| format!("{}/{}", amount_asset, price_asset))
             .collect::<Vec<_>>();
 
-        let resp = self.query_rates(pairs).await?;
+        let body = json!({ "pairs": &pairs });
+
+        let resp: dto::RatesResponse = self
+            .create_req_handler(self.post("rates").json(&body), "rates::rates_to_same_asset")
+            .execute()
+            .await?;
 
         let res = resp
             .data
@@ -63,38 +72,6 @@ impl HttpClient<RatesSvcApi> {
             .collect::<HashMap<_, _>>();
 
         Ok(res)
-    }
-
-    async fn query_rates(&self, pairs: Vec<String>) -> Result<dto::RatesResponse, Error> {
-        let url = "rates";
-        let body = json!({ "pairs": &pairs });
-        debug!("Querying rates:\n\tURL: {}\n\tBody:{}", url, body);
-
-        let req_start_time = chrono::Utc::now();
-        let resp = self
-            .post(url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(std::sync::Arc::new(err), "Failed to get rates".to_string())
-            })?
-            .json::<dto::RatesResponse>()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json while fetching rates".to_string(),
-                )
-            })?;
-        let req_end_time = chrono::Utc::now();
-
-        debug!(
-            "rates request took {:?}ms",
-            (req_end_time - req_start_time).num_milliseconds()
-        );
-
-        Ok(resp)
     }
 }
 

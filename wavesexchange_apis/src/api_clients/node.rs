@@ -1,9 +1,7 @@
 use self::dto::*;
 use crate::models::DataEntryValue;
 use crate::{BaseApi, Error, HttpClient};
-use reqwest::StatusCode;
 use serde_json::json;
-use wavesexchange_log::debug;
 
 #[derive(Clone)]
 pub struct NodeApi;
@@ -19,48 +17,14 @@ impl HttpClient<NodeApi> {
         let body = StateRequest {
             keys: keys.into_iter().map(Into::into).collect(),
         };
-
         let endpoint_url = format!("addresses/data/{}", address.as_ref());
 
-        let req_start_time = chrono::Utc::now();
+        let resp: Vec<DataEntryResponse> = self
+            .create_req_handler(self.post(&endpoint_url).json(&body), "node::data_entries")
+            .execute()
+            .await?;
 
-        let resp_raw = self
-            .post(&endpoint_url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to mget data entries from node".to_string(),
-                )
-            })?;
-
-        let resp_status = resp_raw.status();
-
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "node mget data entries request took {:?}ms, status: {:?}",
-            (req_end_time - req_start_time).num_milliseconds(),
-            resp_status,
-        );
-
-        if resp_status == StatusCode::OK {
-            let resp: Vec<DataEntryResponse> = resp_raw.json().await.map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json while fetching data entries from node".to_string(),
-                )
-            })?;
-
-            Ok(resp.into_iter().map(Into::into).collect())
-        } else {
-            let body = resp_raw.text().await.unwrap_or_else(|_| "".to_owned());
-            Err(Error::InvalidStatus(
-                    resp_status,
-                    format!("Upstream API error while fetching data entries from node. Status {:?}, URL: {}, body: {}", resp_status, endpoint_url, body)
-                ))
-        }
+        Ok(resp.into_iter().map(Into::into).collect())
     }
 
     pub async fn evaluate(
@@ -71,67 +35,19 @@ impl HttpClient<NodeApi> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
 
-        let req_start_time = chrono::Utc::now();
+        let resp: EvaluateResponse = self
+            .create_req_handler(self.post(&endpoint_url).json(&body), "node::evaluate")
+            .execute()
+            .await?;
 
-        let resp_raw = self
-            .post(&endpoint_url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to the evaluate result from the node".to_string(),
-                )
-            })?;
-
-        let resp_status = resp_raw.status();
-
-        let req_end_time = chrono::Utc::now();
-        debug!(
-            "node evaluate request took {:?}ms, status: {}",
-            (req_end_time - req_start_time).num_milliseconds(),
-            resp_status,
-        );
-
-        if resp_status == StatusCode::OK {
-            let resp: EvaluateResponse = resp_raw.json().await.map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json while fetching the evaluate result from the node"
-                        .to_string(),
-                )
-            })?;
-
-            Ok(resp.result)
-        } else {
-            let body = resp_raw.text().await.unwrap_or_else(|_| "".to_owned());
-            Err(Error::InvalidStatus(
-                    resp_status,
-                    format!("Upstream API error while fetching rates from data-service. Status {:?}, URL: {}, body: {}, ", resp_status, endpoint_url, body)
-                ))
-        }
+        Ok(resp.result)
     }
 
     pub async fn get_last_height(&self) -> Result<i32, Error> {
         let r: LastHeight = self
-            .get("blocks/height")
-            .send()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to get height from node REST api".to_string(),
-                )
-            })?
-            .json()
-            .await
-            .map_err(|err| {
-                Error::HttpRequestError(
-                    std::sync::Arc::new(err),
-                    "Failed to parse json while fetching height from node REST api".to_string(),
-                )
-            })?;
+            .create_req_handler(self.get("blocks/height"), "node::get_last_height")
+            .execute()
+            .await?;
 
         Ok(r.height)
     }
