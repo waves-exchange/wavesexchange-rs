@@ -4,7 +4,7 @@ use self::dto::*;
 use crate::{BaseApi, HttpClient};
 
 #[derive(Clone)]
-pub struct DataSvcApi(Box<HttpClient<Self>>);
+pub struct DataSvcApi;
 
 impl BaseApi for DataSvcApi {}
 
