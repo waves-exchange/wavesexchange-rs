@@ -176,7 +176,7 @@ pub mod dto {
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct MatcherWavesBalance {
-        available: BigDecimal,
+        pub available: BigDecimal,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -197,9 +197,9 @@ pub mod dto {
     pub struct AssetDetailItem {
         #[serde(rename(deserialize = "assetId"))]
         pub asset_id: String,
-        decimals: u8,
-        description: String,
-        name: String,
+        pub decimals: u8,
+        pub description: String,
+        pub name: String,
     }
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
