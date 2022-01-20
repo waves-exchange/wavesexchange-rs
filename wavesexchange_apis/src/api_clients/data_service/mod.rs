@@ -3,7 +3,7 @@ mod impls;
 use self::dto::*;
 use crate::{BaseApi, HttpClient};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DataSvcApi;
 
 impl BaseApi for DataSvcApi {}

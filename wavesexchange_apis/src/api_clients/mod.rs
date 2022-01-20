@@ -18,4 +18,6 @@ pub use node::NodeApi;
 pub use rates_service::RatesSvcApi;
 pub use state_service::StateSvcApi;
 
-pub trait BaseApi: Sync + Clone {}
+use std::fmt::Debug;
+
+pub trait BaseApi: Sync + Clone + Debug {}

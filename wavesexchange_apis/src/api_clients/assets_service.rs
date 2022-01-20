@@ -3,7 +3,7 @@ use itertools::join;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use wavesexchange_log::timer;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AssetsSvcApi;
 
 impl BaseApi for AssetsSvcApi {}

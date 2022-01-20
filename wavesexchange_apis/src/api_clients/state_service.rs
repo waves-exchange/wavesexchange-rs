@@ -13,7 +13,7 @@ pub enum HistoryPeg {
     Timestamp(String),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StateSvcApi;
 
 impl BaseApi for StateSvcApi {}

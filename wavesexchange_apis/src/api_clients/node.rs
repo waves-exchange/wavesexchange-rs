@@ -5,7 +5,7 @@ use itertools::join;
 use reqwest::StatusCode;
 use serde_json::json;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NodeApi;
 
 impl BaseApi for NodeApi {}

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LevexApi;
 
 impl BaseApi for LevexApi {}

@@ -2,7 +2,7 @@ use crate::{BaseApi, Error, HttpClient};
 use bigdecimal::BigDecimal;
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MatcherApi;
 
 impl BaseApi for MatcherApi {}

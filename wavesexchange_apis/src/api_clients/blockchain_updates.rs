@@ -12,7 +12,7 @@ use waves_protobuf_schemas::waves::events::{
     BlockchainUpdated,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockchainUpdApi;
 
 impl BaseApi for BlockchainUpdApi {}

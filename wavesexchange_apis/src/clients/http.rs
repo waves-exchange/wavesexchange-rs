@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 use wavesexchange_log::debug;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HttpClient<A: BaseApi> {
     base_url: Option<String>,
     client: Client,

@@ -1,7 +1,7 @@
 use self::dto::*;
 use crate::{BaseApi, Error, HttpClient};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InterestSvcApi;
 
 impl BaseApi for InterestSvcApi {}

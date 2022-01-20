@@ -2,7 +2,7 @@ use crate::{BaseApi, Error};
 use std::{marker::PhantomData, sync::Arc};
 use waves_protobuf_schemas::waves::events::grpc::blockchain_updates_api_client::BlockchainUpdatesApiClient;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GrpcClient<A: BaseApi> {
     pub grpc_client: BlockchainUpdatesApiClient<tonic::transport::Channel>,
     _pd: PhantomData<A>,

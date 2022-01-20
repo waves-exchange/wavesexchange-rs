@@ -5,7 +5,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RatesSvcApi;
 
 impl BaseApi for RatesSvcApi {}
