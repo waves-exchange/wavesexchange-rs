@@ -1,6 +1,8 @@
 use self::dto::*;
 use crate::models::DataEntryValue;
 use crate::{BaseApi, Error, HttpClient};
+use itertools::join;
+use reqwest::StatusCode;
 use serde_json::json;
 
 #[derive(Clone)]
@@ -51,10 +53,53 @@ impl HttpClient<NodeApi> {
 
         Ok(r.height)
     }
+
+    pub async fn matcher_waves_balance(
+        &self,
+        address: &String,
+    ) -> Result<Option<MatcherWavesBalance>, Error> {
+        let url = format!("addresses/balance/details/{address}");
+        self.create_req_handler(self.get(url), "node::matcher_waves_balance")
+            .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
+            .execute()
+            .await
+    }
+
+    pub async fn balances_on_matcher(
+        &self,
+        address: &String,
+        asset_ids: Vec<&String>,
+    ) -> Result<Option<MatcherBalances>, Error> {
+        let url = format!("assets/balance/{address}");
+        let data = json!({ "ids": asset_ids });
+        self.create_req_handler(self.post(url).json(&data), "node::balances_on_matcher")
+            .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
+            .execute()
+            .await
+    }
+
+    pub async fn assets_details(
+        &self,
+        assets: &Vec<&String>,
+    ) -> Result<Option<Vec<AssetDetail>>, Error> {
+        let url = format!(
+            "assets/details?id={}",
+            join(
+                assets.iter().filter(|e| { !e.as_str().eq("WAVES") }),
+                "&id="
+            )
+        );
+
+        self.create_req_handler(self.get(url), "node::assets_details")
+            .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
+            .execute()
+            .await
+    }
 }
 
 pub mod dto {
     use super::*;
+    use bigdecimal::BigDecimal;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
@@ -127,6 +172,47 @@ pub mod dto {
     #[derive(Debug, Deserialize)]
     pub(super) struct EvaluateResponse {
         pub result: Value,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct MatcherWavesBalance {
+        available: BigDecimal,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct MatcherBalances {
+        pub address: String,
+        pub balances: Vec<BalanceItem>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct BalanceItem {
+        #[serde(rename(deserialize = "assetId"))]
+        pub asset_id: String,
+        pub balance: u64,
+        pub quantity: Option<u64>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct AssetDetailItem {
+        #[serde(rename(deserialize = "assetId"))]
+        pub asset_id: String,
+        decimals: u8,
+        description: String,
+        name: String,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct AssetDetailError {
+        pub error: isize,
+        pub message: String,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[serde(untagged)]
+    pub enum AssetDetail {
+        Ok(AssetDetailItem),
+        Err(AssetDetailError),
     }
 }
 

@@ -24,6 +24,8 @@ pub mod blockchains {
             "https://mainnet-dev.waves.exchange/api/v1/forward/data_service";
         pub const node_url: &'static str = "https://nodes.waves.exchange";
         pub const matcher_url: &'static str = "https://matcher.waves.exchange";
+        pub const matcher_api_url: &'static str =
+            "https://matcher.waves.exchange/matcher/settings/rates";
         pub const state_service_url: &'static str = "https://waves.exchange/api/v1/state";
         pub const assets_service_url: &'static str = "https://waves.exchange/api/v1/assets";
         pub const levex_api_url: &'static str = "https://api.levex.fi";
@@ -87,6 +89,8 @@ pub mod blockchains {
         pub const data_service_url: &'static str = "https://api-testnet.wavesplatform.com";
         pub const node_url: &'static str = "https://nodes-testnet.wavesnodes.com";
         pub const matcher_url: &'static str = "https://matcher-testnet.waves.exchange";
+        pub const matcher_api_url: &'static str =
+            "https://matcher-testnet.waves.exchange/matcher/settings/rates";
         pub const state_service_url: &'static str = "https://testnet.waves.exchange/api/v1/state";
         pub const assets_service_url: &'static str = "https://testnet.waves.exchange/api/v1/assets";
         pub const levex_api_url: &'static str = "https://api.levex.fi";

@@ -1,6 +1,7 @@
 use crate::{BaseApi, Error, HttpClient};
 use bigdecimal::BigDecimal;
 use itertools::Itertools;
+use reqwest::StatusCode;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 
@@ -73,6 +74,29 @@ impl HttpClient<RatesSvcApi> {
 
         Ok(res)
     }
+
+    pub async fn exchange_rates(
+        &self,
+        assets: impl IntoIterator<Item = &str> + Send,
+        to_asset: impl AsRef<str> + Send,
+    ) -> Result<Option<dto::RatesResponse>, Error> {
+        let to_asset = to_asset.as_ref();
+        let mut pairs: Vec<_> = vec![];
+        pairs.push(format!("{}/{}", "WAVES", to_asset));
+
+        assets
+            .into_iter()
+            .map(|a| {
+                pairs.push(format!("{}/{}", a, to_asset));
+            })
+            .count();
+
+        let query = json!({ "pairs": &pairs });
+        self.create_req_handler(self.post("rates/").json(&query), "rates::exchange_rates")
+            .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
+            .execute()
+            .await
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,19 +123,19 @@ pub mod dto {
     use serde::Deserialize;
 
     #[derive(Deserialize)]
-    pub(super) struct RatesResponse {
+    pub struct RatesResponse {
         pub data: Vec<Rate>,
     }
 
     #[derive(Deserialize)]
-    pub(super) struct Rate {
+    pub struct Rate {
         pub pair: String,
         pub heuristics: Vec<String>,
         pub data: RateData,
     }
 
     #[derive(Deserialize)]
-    pub(super) struct RateData {
+    pub struct RateData {
         pub rate: Option<BigDecimal>,
         pub heuristic: Option<BigDecimal>,
         pub exchange: Option<BigDecimal>,

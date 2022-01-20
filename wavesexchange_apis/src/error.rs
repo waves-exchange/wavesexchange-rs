@@ -26,7 +26,9 @@ pub async fn invalid_status(resp: Response, req_info: impl Into<String>) -> Erro
     let req_info = req_info.into();
     Error::InvalidStatus(
         status,
-        format!("Upstream API error while fetching request '{req_info}', url: {url}, body: {body}"),
+        format!(
+            "Upstream API error while fetching request '{req_info}', url: '{url}', body: '{body}'"
+        ),
     )
 }
 
