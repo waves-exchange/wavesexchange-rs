@@ -4,6 +4,7 @@ use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder, Response
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::time::Duration;
 use wavesexchange_log::debug;
 
 #[derive(Clone)]
@@ -96,6 +97,7 @@ impl<A: BaseApi> HttpClient<A> {
 pub struct HttpClientBuilder<A: BaseApi> {
     base_url: Option<String>,
     builder: ClientBuilder,
+    pool_max_idle_per_host: usize,
     _pd: PhantomData<A>,
 }
 
@@ -104,6 +106,7 @@ impl<A: BaseApi> HttpClientBuilder<A> {
         HttpClientBuilder {
             base_url: None,
             builder: ClientBuilder::new(),
+            pool_max_idle_per_host: 1,
             _pd: PhantomData,
         }
     }
@@ -118,8 +121,20 @@ impl<A: BaseApi> HttpClientBuilder<A> {
         self
     }
 
+    pub fn pool_max_idle_per_host(mut self, connections: usize) -> Self {
+        self.pool_max_idle_per_host = connections;
+        self
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.builder = self.builder.timeout(timeout).connect_timeout(timeout);
+        self
+    }
+
     pub fn try_build(mut self) -> Result<HttpClient<A>, ReqError> {
-        self.builder = self.builder.pool_max_idle_per_host(1);
+        self.builder = self
+            .builder
+            .pool_max_idle_per_host(self.pool_max_idle_per_host);
         Ok(HttpClient {
             base_url: self.base_url,
             client: self.builder.build()?,

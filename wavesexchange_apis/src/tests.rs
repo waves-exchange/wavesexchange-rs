@@ -21,7 +21,7 @@ pub mod blockchains {
 
         // upstream
         pub const data_service_url: &'static str =
-            "https://mainnet-dev.waves.exchange/api/v1/forward/data_service";
+            "https://mainnet-dev.wvservices.exchange/api/v1/forward/data_service";
         pub const node_url: &'static str = "https://nodes.waves.exchange";
         pub const matcher_url: &'static str = "https://matcher.waves.exchange";
         pub const matcher_api_url: &'static str =

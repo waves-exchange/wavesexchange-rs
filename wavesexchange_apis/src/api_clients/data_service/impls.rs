@@ -1,10 +1,11 @@
 use super::{
-    dto, DataSvcApi, GenericTransaction, InvokeScriptArgument, InvokeScriptCall,
-    InvokeScriptTransaction, List, Sort,
+    dto, DSList, DataSvcApi, GenericTransaction, InvokeScriptArgument, InvokeScriptCall,
+    InvokeScriptTransaction, Sort,
 };
 use crate::{Error, HttpClient};
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use wavesexchange_log::debug;
+use wavesexchange_warp::pagination::{List, PageInfo};
 
 const HEADER_ORIGIN_NAME: &str = "Origin";
 const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
@@ -61,7 +62,7 @@ impl HttpClient<DataSvcApi> {
         // timestamp_gte: NaiveDateTime,
         sort: Sort,
         limit: usize,
-    ) -> Result<List<InvokeScriptTransaction>, Error> {
+    ) -> Result<DSList<InvokeScriptTransaction>, Error> {
         let url = format!(
             "transactions/invoke-script?dapp={}&function={}&timeEnd={:?}&sort={}&limit={}",
             dapp.as_ref(),
@@ -71,7 +72,7 @@ impl HttpClient<DataSvcApi> {
             limit,
         );
 
-        let resp: List<dto::InvokeScriptTransactionResponse> = self
+        let resp: DSList<dto::InvokeScriptTransactionResponse> = self
             .create_req_handler(
                 self.get(&url)
                     .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
@@ -80,7 +81,7 @@ impl HttpClient<DataSvcApi> {
             .execute()
             .await?;
 
-        let list: List<InvokeScriptTransaction> = List {
+        let list: DSList<InvokeScriptTransaction> = DSList {
             data: resp.data.into_iter().map(Into::into).collect(),
             last_cursor: resp.last_cursor,
             is_last_page: resp.is_last_page,
@@ -100,7 +101,7 @@ impl HttpClient<DataSvcApi> {
             timestamp.into(),
         );
 
-        let resp: List<dto::GenericTransactionResponse> = self
+        let resp: DSList<dto::GenericTransactionResponse> = self
             .create_req_handler(
                 self.get(&url)
                     .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
@@ -117,7 +118,7 @@ impl HttpClient<DataSvcApi> {
             return Ok(None);
         }
 
-        let list: List<GenericTransaction> = List {
+        let list: DSList<GenericTransaction> = DSList {
             data: resp.data.into_iter().map(Into::into).collect(),
             last_cursor: resp.last_cursor,
             is_last_page: resp.is_last_page,
@@ -132,6 +133,60 @@ impl HttpClient<DataSvcApi> {
                 list.data.len()
             )))
         }
+    }
+
+    pub async fn asset_by_ticker(
+        &self,
+        ticker: impl AsRef<str>,
+    ) -> Result<Option<dto::AssetInfo>, Error> {
+        use dto::Data;
+
+        let url = format!("assets?ticker={}", ticker.as_ref());
+
+        let resp: Data<Vec<Data<dto::AssetInfo>>> = self
+            .create_req_handler(self.get(&url), "data_service::asset_by_ticker")
+            .execute()
+            .await?;
+        Ok(resp.data.into_iter().next().map(|d| d.data))
+    }
+
+    pub async fn transactions_exchange(
+        &self,
+        sender: Option<impl AsRef<str>>,
+        amount_asset_id: Option<impl AsRef<str>>,
+        price_asset_id: Option<impl AsRef<str>>,
+        time_start: Option<DateTime<Utc>>,
+        time_end: Option<DateTime<Utc>>,
+        sort: Sort,
+        limit: usize,
+        after: Option<impl AsRef<str>>,
+    ) -> Result<List<dto::ExchangeTransaction>, Error> {
+        let query_string = serde_qs::to_string(&dto::ExchangeTransactionsQueryParams {
+            amount_asset: amount_asset_id.map(|id| id.as_ref().to_owned()),
+            price_asset: price_asset_id.map(|id| id.as_ref().to_owned()),
+            sender: sender.map(|id| id.as_ref().to_owned()),
+            time_start,
+            time_end,
+            sort,
+            limit,
+            after: after.map(|id| id.as_ref().to_owned()),
+        })
+        .unwrap();
+
+        let url = format!("transactions/exchange?{query_string}");
+
+        let resp: DSList<dto::Data<dto::ExchangeTransaction>> = self
+            .create_req_handler(self.get(&url), "data_service::transactions_exchange")
+            .execute()
+            .await?;
+
+        Ok(List {
+            page_info: PageInfo {
+                has_next_page: !resp.is_last_page,
+                last_cursor: resp.last_cursor,
+            },
+            items: resp.data.into_iter().map(|d| d.data).collect(),
+        })
     }
 }
 
