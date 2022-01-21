@@ -11,9 +11,9 @@ pub struct RatesSvcApi;
 impl BaseApi for RatesSvcApi {}
 
 impl HttpClient<RatesSvcApi> {
-    pub async fn rates(
+    pub async fn rates<S: Into<String>>(
         &self,
-        asset_pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)> + Send,
+        asset_pairs: impl IntoIterator<Item = (S, S)> + Send,
     ) -> Result<HashMap<(String, String), Rate>, Error> {
         let pairs = asset_pairs
             .into_iter()

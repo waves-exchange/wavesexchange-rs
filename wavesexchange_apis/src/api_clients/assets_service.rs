@@ -16,13 +16,9 @@ pub struct AssetInfo {
 impl HttpClient<AssetsSvcApi> {
     pub async fn get_assets<S, I>(
         &self,
-        asset_ids: I,
+        asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
         height: Option<u32>,
-    ) -> Result<Vec<AssetInfo>, Error>
-    where
-        S: AsRef<str> + Send,
-        I: IntoIterator<Item = S> + Send,
-    {
+    ) -> Result<Vec<AssetInfo>, Error> {
         let url = match build_url(&self.base_url(), asset_ids, height) {
             Some(u) => u,
             None => return Ok(vec![]),
@@ -68,14 +64,14 @@ pub mod dto {
     }
 }
 
-fn build_url<S, I>(root_url: &str, asset_ids: I, height: Option<u32>) -> Option<String>
-where
-    S: AsRef<str>,
-    I: IntoIterator<Item = S>,
-{
+fn build_url(
+    root_url: &str,
+    asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
+    height: Option<u32>,
+) -> Option<String> {
     let asset_ids = asset_ids
         .into_iter()
-        .map(|id| utf8_percent_encode(id.as_ref(), NON_ALPHANUMERIC).to_string());
+        .map(|id| utf8_percent_encode(&id.into(), NON_ALPHANUMERIC).to_string());
     let ids = join(asset_ids, "&ids=");
     if ids.is_empty() {
         return None;
@@ -94,8 +90,11 @@ mod tests {
 
     #[test]
     fn test_build_url() {
-        assert_eq!(build_url::<&str, _>("http://assets", vec![], None), None);
-        assert_eq!(build_url::<&str, _>("http://assets", vec![], Some(1)), None);
+        assert_eq!(build_url("http://assets", Vec::<String>::new(), None), None);
+        assert_eq!(
+            build_url("http://assets", Vec::<String>::new(), Some(1)),
+            None
+        );
         assert_eq!(
             build_url("http://assets", vec!["123"], None).unwrap(),
             "http://assets?ids=123"
