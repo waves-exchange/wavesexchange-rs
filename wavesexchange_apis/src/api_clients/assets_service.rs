@@ -14,7 +14,7 @@ pub struct AssetInfo {
 }
 
 impl HttpClient<AssetsSvcApi> {
-    pub async fn get_assets<S, I>(
+    pub async fn get_assets(
         &self,
         asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
         height: Option<u32>,

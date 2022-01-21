@@ -4,7 +4,6 @@ use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder, Response
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::time::Duration;
 use wavesexchange_log::debug;
 
 #[derive(Clone, Debug)]
