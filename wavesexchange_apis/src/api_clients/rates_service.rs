@@ -13,11 +13,11 @@ impl BaseApi for RatesSvcApi {}
 impl HttpClient<RatesSvcApi> {
     pub async fn rates(
         &self,
-        asset_pairs: impl IntoIterator<Item = (&str, &str)> + Send,
+        asset_pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)> + Send,
     ) -> Result<HashMap<(String, String), Rate>, Error> {
         let pairs = asset_pairs
             .into_iter()
-            .map(|(a, b)| format!("{}/{}", a, b))
+            .map(|(a, b)| format!("{}/{}", a.into(), b.into()))
             .collect::<Vec<_>>();
 
         let body = json!({ "pairs": &pairs });
@@ -43,14 +43,14 @@ impl HttpClient<RatesSvcApi> {
 
     pub async fn rates_to_same_asset(
         &self,
-        amount_assets: impl IntoIterator<Item = &str> + Send,
+        amount_assets: impl IntoIterator<Item = impl Into<String>> + Send,
         price_asset: impl AsRef<str> + Send,
     ) -> Result<HashMap<String, Rate>, Error> {
         let price_asset = price_asset.as_ref();
 
         let pairs = amount_assets
             .into_iter()
-            .map(|amount_asset| format!("{}/{}", amount_asset, price_asset))
+            .map(|amount_asset| format!("{}/{}", amount_asset.into(), price_asset))
             .collect::<Vec<_>>();
 
         let body = json!({ "pairs": &pairs });
@@ -77,7 +77,7 @@ impl HttpClient<RatesSvcApi> {
 
     pub async fn exchange_rates(
         &self,
-        assets: impl IntoIterator<Item = &str> + Send,
+        assets: impl IntoIterator<Item = impl Into<String>> + Send,
         to_asset: impl AsRef<str> + Send,
     ) -> Result<Option<dto::RatesResponse>, Error> {
         let to_asset = to_asset.as_ref();
@@ -87,7 +87,7 @@ impl HttpClient<RatesSvcApi> {
         assets
             .into_iter()
             .map(|a| {
-                pairs.push(format!("{}/{}", a, to_asset));
+                pairs.push(format!("{}/{}", a.into(), to_asset));
             })
             .count();
 
