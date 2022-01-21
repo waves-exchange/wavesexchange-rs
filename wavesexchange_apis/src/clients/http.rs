@@ -97,18 +97,17 @@ impl<A: BaseApi> HttpClient<A> {
 pub struct HttpClientBuilder<A: BaseApi> {
     base_url: Option<String>,
     builder: ClientBuilder,
-    pool_max_idle_per_host: usize,
     _pd: PhantomData<A>,
 }
 
 impl<A: BaseApi> HttpClientBuilder<A> {
     pub fn new() -> Self {
-        HttpClientBuilder {
+        let this = HttpClientBuilder {
             base_url: None,
             builder: ClientBuilder::new(),
-            pool_max_idle_per_host: 1,
             _pd: PhantomData,
-        }
+        };
+        this.with_reqwest_builder(|b| b.pool_max_idle_per_host(1))
     }
 
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
@@ -116,25 +115,15 @@ impl<A: BaseApi> HttpClientBuilder<A> {
         self
     }
 
-    pub fn with_user_agent(mut self, user_agent: impl Into<String>) -> Self {
-        self.builder = self.builder.user_agent(user_agent.into());
+    pub fn with_reqwest_builder(
+        mut self,
+        builder: impl Fn(ClientBuilder) -> ClientBuilder,
+    ) -> Self {
+        self.builder = builder(self.builder);
         self
     }
 
-    pub fn pool_max_idle_per_host(mut self, connections: usize) -> Self {
-        self.pool_max_idle_per_host = connections;
-        self
-    }
-
-    pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.builder = self.builder.timeout(timeout).connect_timeout(timeout);
-        self
-    }
-
-    pub fn try_build(mut self) -> Result<HttpClient<A>, ReqError> {
-        self.builder = self
-            .builder
-            .pool_max_idle_per_host(self.pool_max_idle_per_host);
+    pub fn try_build(self) -> Result<HttpClient<A>, ReqError> {
         Ok(HttpClient {
             base_url: self.base_url,
             client: self.builder.build()?,
