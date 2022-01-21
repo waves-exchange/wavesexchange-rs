@@ -56,9 +56,9 @@ impl HttpClient<NodeApi> {
 
     pub async fn matcher_waves_balance(
         &self,
-        address: &String,
+        address: impl AsRef<str> + Send,
     ) -> Result<Option<MatcherWavesBalance>, Error> {
-        let url = format!("addresses/balance/details/{address}");
+        let url = format!("addresses/balance/details/{}", address.as_ref());
         self.create_req_handler(self.get(url), "node::matcher_waves_balance")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
             .execute()
@@ -67,10 +67,11 @@ impl HttpClient<NodeApi> {
 
     pub async fn balances_on_matcher(
         &self,
-        address: &String,
-        asset_ids: Vec<&String>,
+        address: impl AsRef<str> + Send,
+        asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
     ) -> Result<Option<MatcherBalances>, Error> {
-        let url = format!("assets/balance/{address}");
+        let url = format!("assets/balance/{}", address.as_ref());
+        let asset_ids = asset_ids.into_iter().map(Into::into).collect::<Vec<_>>();
         let data = json!({ "ids": asset_ids });
         self.create_req_handler(self.post(url).json(&data), "node::balances_on_matcher")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
@@ -80,12 +81,19 @@ impl HttpClient<NodeApi> {
 
     pub async fn assets_details(
         &self,
-        assets: &Vec<&String>,
+        assets: impl IntoIterator<Item = impl Into<String>> + Send,
     ) -> Result<Option<Vec<AssetDetail>>, Error> {
         let url = format!(
             "assets/details?id={}",
             join(
-                assets.iter().filter(|e| { !e.as_str().eq("WAVES") }),
+                assets.into_iter().filter_map(|s| {
+                    let s = s.into();
+                    if s != "WAVES" {
+                        Some(s)
+                    } else {
+                        None
+                    }
+                }),
                 "&id="
             )
         );
