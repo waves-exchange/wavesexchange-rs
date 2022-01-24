@@ -1,6 +1,6 @@
 use self::dto::*;
 use crate::models::DataEntryValue;
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 use itertools::join;
 use reqwest::StatusCode;
 use serde_json::json;
@@ -15,7 +15,7 @@ impl HttpClient<NodeApi> {
         &self,
         address: impl AsRef<str> + Send,
         keys: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> Result<Vec<DataEntry>, Error> {
+    ) -> ApiResult<Vec<DataEntry>> {
         let body = StateRequest {
             keys: keys.into_iter().map(Into::into).collect(),
         };
@@ -33,7 +33,7 @@ impl HttpClient<NodeApi> {
         &self,
         dapp: impl AsRef<str> + Send,
         expression: impl AsRef<str> + Send,
-    ) -> Result<Value, Error> {
+    ) -> ApiResult<Value> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
 
@@ -45,7 +45,7 @@ impl HttpClient<NodeApi> {
         Ok(resp.result)
     }
 
-    pub async fn get_last_height(&self) -> Result<i32, Error> {
+    pub async fn get_last_height(&self) -> ApiResult<i32> {
         let r: LastHeight = self
             .create_req_handler(self.get("blocks/height"), "node::get_last_height")
             .execute()
@@ -57,7 +57,7 @@ impl HttpClient<NodeApi> {
     pub async fn matcher_waves_balance(
         &self,
         address: impl AsRef<str> + Send,
-    ) -> Result<Option<MatcherWavesBalance>, Error> {
+    ) -> ApiResult<Option<MatcherWavesBalance>> {
         let url = format!("addresses/balance/details/{}", address.as_ref());
         self.create_req_handler(self.get(url), "node::matcher_waves_balance")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
@@ -69,7 +69,7 @@ impl HttpClient<NodeApi> {
         &self,
         address: impl AsRef<str> + Send,
         asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> Result<Option<MatcherBalances>, Error> {
+    ) -> ApiResult<Option<MatcherBalances>> {
         let url = format!("assets/balance/{}", address.as_ref());
         let asset_ids = asset_ids.into_iter().map(Into::into).collect::<Vec<_>>();
         let data = json!({ "ids": asset_ids });
@@ -82,7 +82,7 @@ impl HttpClient<NodeApi> {
     pub async fn assets_details(
         &self,
         assets: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> Result<Option<Vec<AssetDetail>>, Error> {
+    ) -> ApiResult<Option<Vec<AssetDetail>>> {
         let url = format!(
             "assets/details?id={}",
             join(

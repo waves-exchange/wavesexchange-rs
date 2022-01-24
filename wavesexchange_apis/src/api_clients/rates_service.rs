@@ -1,4 +1,4 @@
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 use bigdecimal::BigDecimal;
 use itertools::Itertools;
 use reqwest::StatusCode;
@@ -14,7 +14,7 @@ impl HttpClient<RatesSvcApi> {
     pub async fn rates<S: Into<String>>(
         &self,
         asset_pairs: impl IntoIterator<Item = (S, S)> + Send,
-    ) -> Result<HashMap<(String, String), Rate>, Error> {
+    ) -> ApiResult<HashMap<(String, String), Rate>> {
         let pairs = asset_pairs
             .into_iter()
             .map(|(a, b)| format!("{}/{}", a.into(), b.into()))
@@ -45,7 +45,7 @@ impl HttpClient<RatesSvcApi> {
         &self,
         amount_assets: impl IntoIterator<Item = impl Into<String>> + Send,
         price_asset: impl AsRef<str> + Send,
-    ) -> Result<HashMap<String, Rate>, Error> {
+    ) -> ApiResult<HashMap<String, Rate>> {
         let price_asset = price_asset.as_ref();
 
         let pairs = amount_assets
@@ -79,7 +79,7 @@ impl HttpClient<RatesSvcApi> {
         &self,
         assets: impl IntoIterator<Item = impl Into<String>> + Send,
         to_asset: impl AsRef<str> + Send,
-    ) -> Result<Option<dto::RatesResponse>, Error> {
+    ) -> ApiResult<Option<dto::RatesResponse>> {
         let to_asset = to_asset.as_ref();
         let mut pairs: Vec<_> = vec![];
         pairs.push(format!("{}/{}", "WAVES", to_asset));

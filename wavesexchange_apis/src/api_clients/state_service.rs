@@ -1,5 +1,5 @@
 use self::dto::*;
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -24,7 +24,7 @@ impl HttpClient<StateSvcApi> {
         address: impl AsRef<str>,
         key: impl AsRef<str>,
         history_peg: Option<HistoryPeg>,
-    ) -> Result<Option<DataEntry>, Error> {
+    ) -> ApiResult<Option<DataEntry>> {
         let key_encoded = utf8_percent_encode(key.as_ref(), NON_ALPHANUMERIC);
         let url = match history_peg {
             None => {
@@ -57,7 +57,7 @@ impl HttpClient<StateSvcApi> {
     pub async fn search(
         &self,
         query: impl Into<serde_json::Value> + Send,
-    ) -> Result<Vec<DataEntry>, Error> {
+    ) -> ApiResult<Vec<DataEntry>> {
         let mut entries = vec![];
         let limit = 1000;
         let mut cnt = 0;

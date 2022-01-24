@@ -1,4 +1,4 @@
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 use bigdecimal::BigDecimal;
 use std::collections::HashMap;
 
@@ -8,7 +8,7 @@ pub struct MatcherApi;
 impl BaseApi for MatcherApi {}
 
 impl HttpClient<MatcherApi> {
-    pub async fn assets_from_matcher(&self) -> Result<HashMap<String, BigDecimal>, Error> {
+    pub async fn assets_from_matcher(&self) -> ApiResult<HashMap<String, BigDecimal>> {
         self.create_req_handler(self.get(""), "matcher::assets_from_matcher")
             .execute()
             .await

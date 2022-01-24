@@ -2,7 +2,7 @@ use super::{
     dto, DSList, DataSvcApi, GenericTransaction, InvokeScriptArgument, InvokeScriptCall,
     InvokeScriptTransaction, Sort,
 };
-use crate::{Error, HttpClient};
+use crate::{ApiResult, Error, HttpClient};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use wavesexchange_log::debug;
 use wavesexchange_warp::pagination::{List, PageInfo};
@@ -20,7 +20,7 @@ impl HttpClient<DataSvcApi> {
         matcher_address: S1,
         pairs: I,
         timestamp: Option<NaiveDateTime>,
-    ) -> Result<Vec<Option<f64>>, Error> {
+    ) -> ApiResult<Vec<Option<f64>>> {
         let req = dto::RatesRequest {
             pairs: pairs
                 .into_iter()
@@ -62,7 +62,7 @@ impl HttpClient<DataSvcApi> {
         // timestamp_gte: NaiveDateTime,
         sort: Sort,
         limit: usize,
-    ) -> Result<DSList<InvokeScriptTransaction>, Error> {
+    ) -> ApiResult<DSList<InvokeScriptTransaction>> {
         let url = format!(
             "transactions/invoke-script?dapp={}&function={}&timeEnd={:?}&sort={}&limit={}",
             dapp.as_ref(),
@@ -94,7 +94,7 @@ impl HttpClient<DataSvcApi> {
         &self,
         sender: impl AsRef<str> + Send,
         timestamp: impl Into<NaiveDateTime> + Send,
-    ) -> Result<Option<GenericTransaction>, Error> {
+    ) -> ApiResult<Option<GenericTransaction>> {
         let url = format!(
             "transactions/exchange?sender={}&timeEnd={:?}&limit=1",
             sender.as_ref(),
@@ -138,7 +138,7 @@ impl HttpClient<DataSvcApi> {
     pub async fn asset_by_ticker(
         &self,
         ticker: impl AsRef<str>,
-    ) -> Result<Option<dto::AssetInfo>, Error> {
+    ) -> ApiResult<Option<dto::AssetInfo>> {
         use dto::Data;
 
         let url = format!("assets?ticker={}", ticker.as_ref());
@@ -160,7 +160,7 @@ impl HttpClient<DataSvcApi> {
         sort: Sort,
         limit: usize,
         after: Option<impl AsRef<str>>,
-    ) -> Result<List<dto::ExchangeTransaction>, Error> {
+    ) -> ApiResult<List<dto::ExchangeTransaction>> {
         let query_string = serde_qs::to_string(&dto::ExchangeTransactionsQueryParams {
             amount_asset: amount_asset_id.map(|id| id.as_ref().to_owned()),
             price_asset: price_asset_id.map(|id| id.as_ref().to_owned()),

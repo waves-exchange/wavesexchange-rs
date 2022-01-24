@@ -1,5 +1,5 @@
 use crate::models::assets::{AssetId, LeveragedPairId};
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, Error, HttpClient};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
@@ -10,7 +10,7 @@ pub struct LevexApi;
 impl BaseApi for LevexApi {}
 
 impl HttpClient<LevexApi> {
-    pub async fn leveraged_tokens_summary(&self) -> Result<Pairs, Error> {
+    pub async fn leveraged_tokens_summary(&self) -> ApiResult<Pairs> {
         let resp: dto::SummaryResponse = self
             .create_req_handler(self.get("summary"), "levex::leveraged_tokens_summary")
             .execute()

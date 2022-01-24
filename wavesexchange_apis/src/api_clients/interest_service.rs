@@ -1,5 +1,5 @@
 use self::dto::*;
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 
 #[derive(Clone, Debug)]
 pub struct InterestSvcApi;
@@ -7,10 +7,7 @@ pub struct InterestSvcApi;
 impl BaseApi for InterestSvcApi {}
 
 impl HttpClient<InterestSvcApi> {
-    pub async fn interest_rates(
-        &self,
-        asset_id: impl AsRef<str>,
-    ) -> Result<Vec<AnnualRate>, Error> {
+    pub async fn interest_rates(&self, asset_id: impl AsRef<str>) -> ApiResult<Vec<AnnualRate>> {
         let url = format!("interest_rates/{}", asset_id.as_ref());
 
         let resp: InterestRatesResponse = self

@@ -1,4 +1,4 @@
-use crate::{BaseApi, Error, GrpcClient};
+use crate::{ApiResult, BaseApi, Error, GrpcClient};
 use itertools::Itertools;
 use std::{
     collections::HashMap,
@@ -21,7 +21,7 @@ impl GrpcClient<BlockchainUpdApi> {
     pub async fn fetch_transactions_at_height(
         &self,
         height: u32,
-    ) -> Result<TransactionsAtHeight, Error> {
+    ) -> ApiResult<TransactionsAtHeight> {
         let request = tonic::Request::new(GetBlockUpdateRequest {
             height: height as i32,
         });

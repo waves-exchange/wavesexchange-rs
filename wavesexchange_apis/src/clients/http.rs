@@ -1,4 +1,4 @@
-use crate::{error, BaseApi, Error};
+use crate::{error, ApiResult, BaseApi, Error};
 use futures::{future::BoxFuture, Future};
 use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
@@ -58,7 +58,7 @@ impl<A: BaseApi> HttpClient<A> {
         &self,
         req: RequestBuilder,
         req_info: impl Into<String>,
-    ) -> Result<Response, Error> {
+    ) -> ApiResult<Response> {
         let req_info = req_info.into();
         let request = req.build().unwrap();
         let method = request.method().as_str();
@@ -162,20 +162,23 @@ type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, Result<T,
 ///     )
 ///     .execute()
 /// ```
-pub(crate) struct WXRequestHandler<
-    'cli,
+pub(crate) struct WXRequestHandler<'cli, A, T, RS>
+where
     A: BaseApi,
     T: DeserializeOwned,
     RS: Into<String> + Clone + Send,
-> {
+{
     client: &'cli HttpClient<A>,
     req: Option<RequestBuilder>,
     req_info: RS,
     status_handlers: HashMap<StatusCodes, StatusHandler<T>>,
 }
 
-impl<'cli, A: BaseApi, T: DeserializeOwned, RS: Into<String> + Clone + Send>
-    WXRequestHandler<'cli, A, T, RS>
+impl<'cli, A, T, RS> WXRequestHandler<'cli, A, T, RS>
+where
+    A: BaseApi,
+    T: DeserializeOwned,
+    RS: Into<String> + Clone + Send,
 {
     pub fn from_request(client: &'cli HttpClient<A>, req: RequestBuilder, req_info: RS) -> Self {
         let this = Self {
@@ -217,7 +220,7 @@ impl<'cli, A: BaseApi, T: DeserializeOwned, RS: Into<String> + Clone + Send>
         })
     }
 
-    pub async fn execute(mut self) -> Result<T, Error> {
+    pub async fn execute(mut self) -> ApiResult<T> {
         let req = self.req.take().unwrap();
         let req_info = self.req_info.clone().into();
         let resp = self.client.do_request(req, req_info).await?;

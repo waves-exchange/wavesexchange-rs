@@ -1,4 +1,4 @@
-use crate::{BaseApi, Error};
+use crate::{ApiResult, BaseApi};
 use std::{marker::PhantomData, sync::Arc};
 use waves_protobuf_schemas::waves::events::grpc::blockchain_updates_api_client::BlockchainUpdatesApiClient;
 
@@ -9,7 +9,7 @@ pub struct GrpcClient<A: BaseApi> {
 }
 
 impl<A: BaseApi> GrpcClient<A> {
-    pub async fn new(blockchain_updates_url: &str) -> Result<Self, Error> {
+    pub async fn new(blockchain_updates_url: &str) -> ApiResult<Self> {
         Ok(GrpcClient {
             grpc_client: BlockchainUpdatesApiClient::connect(blockchain_updates_url.to_owned())
                 .await

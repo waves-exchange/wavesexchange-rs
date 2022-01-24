@@ -1,6 +1,8 @@
 use reqwest::{Error as ReqError, Response};
 use std::sync::Arc;
 
+pub type ApiResult<T> = Result<T, Error>;
+
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error("HttpRequestError: {1} - {0}")]

@@ -1,4 +1,4 @@
-use crate::{BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 use itertools::join;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use wavesexchange_log::timer;
@@ -18,7 +18,7 @@ impl HttpClient<AssetsSvcApi> {
         &self,
         asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
         height: Option<u32>,
-    ) -> Result<Vec<AssetInfo>, Error> {
+    ) -> ApiResult<Vec<AssetInfo>> {
         let url = match build_url(&self.base_url(), asset_ids, height) {
             Some(u) => u,
             None => return Ok(vec![]),
