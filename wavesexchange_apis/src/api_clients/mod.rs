@@ -1,6 +1,7 @@
 pub mod assets_service;
 pub mod blockchain_updates;
 pub mod data_service;
+pub mod identity;
 pub mod interest_service;
 pub mod levex;
 pub mod liquidity_pools;
@@ -14,6 +15,7 @@ pub mod transfers;
 pub use assets_service::AssetsSvcApi;
 pub use blockchain_updates::BlockchainUpdApi;
 pub use data_service::DataSvcApi;
+pub use identity::IdentityApi;
 pub use interest_service::InterestSvcApi;
 pub use levex::LevexApi;
 pub use liquidity_pools::LiquidityPoolsApi;

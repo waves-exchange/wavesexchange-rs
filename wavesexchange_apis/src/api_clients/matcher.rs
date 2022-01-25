@@ -13,6 +13,44 @@ impl HttpClient<MatcherApi> {
             .execute()
             .await
     }
+
+    pub async fn place_limit_order(&self, order: String) -> ApiResult<dto::PlaceOrderResponse> {
+        self.create_req_handler(
+            self.post("matcher/orderbook")
+                .header("Content-Type", "application/json")
+                .body(order.into_bytes()),
+            "matcher::place_limit_order",
+        )
+        .execute()
+        .await
+    }
+
+    pub async fn place_market_order(&self, order: String) -> ApiResult<dto::PlaceOrderResponse> {
+        self.create_req_handler(
+            self.post("matcher/orderbook/market")
+                .header("Content-Type", "application/json")
+                .body(order.into_bytes()),
+            "matcher::place_market_order",
+        )
+        .execute()
+        .await
+    }
+}
+
+pub mod dto {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Deserialize, Serialize)]
+    pub enum OrderStatus {
+        OrderAccepted,
+    }
+
+    #[derive(Debug, Deserialize, Serialize)]
+    pub struct PlaceOrderResponse {
+        pub success: bool,
+        pub status: OrderStatus,
+        pub message: serde_json::Value,
+    }
 }
 
 #[cfg(test)]

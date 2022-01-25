@@ -1,4 +1,3 @@
-use self::dto::*;
 use crate::models::DataEntryValue;
 use crate::{ApiResult, BaseApi, HttpClient};
 use itertools::join;
@@ -15,13 +14,13 @@ impl HttpClient<NodeApi> {
         &self,
         address: impl AsRef<str> + Send,
         keys: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> ApiResult<Vec<DataEntry>> {
-        let body = StateRequest {
+    ) -> ApiResult<Vec<dto::DataEntry>> {
+        let body = dto::StateRequest {
             keys: keys.into_iter().map(Into::into).collect(),
         };
         let endpoint_url = format!("addresses/data/{}", address.as_ref());
 
-        let resp: Vec<DataEntryResponse> = self
+        let resp: Vec<dto::DataEntryResponse> = self
             .create_req_handler(self.post(&endpoint_url).json(&body), "node::data_entries")
             .execute()
             .await?;
@@ -33,11 +32,11 @@ impl HttpClient<NodeApi> {
         &self,
         dapp: impl AsRef<str> + Send,
         expression: impl AsRef<str> + Send,
-    ) -> ApiResult<Value> {
+    ) -> ApiResult<dto::Value> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
 
-        let resp: EvaluateResponse = self
+        let resp: dto::EvaluateResponse = self
             .create_req_handler(self.post(&endpoint_url).json(&body), "node::evaluate")
             .execute()
             .await?;
@@ -46,7 +45,7 @@ impl HttpClient<NodeApi> {
     }
 
     pub async fn get_last_height(&self) -> ApiResult<i32> {
-        let r: LastHeight = self
+        let r: dto::LastHeight = self
             .create_req_handler(self.get("blocks/height"), "node::get_last_height")
             .execute()
             .await?;
@@ -57,7 +56,7 @@ impl HttpClient<NodeApi> {
     pub async fn matcher_waves_balance(
         &self,
         address: impl AsRef<str> + Send,
-    ) -> ApiResult<Option<MatcherWavesBalance>> {
+    ) -> ApiResult<Option<dto::MatcherWavesBalance>> {
         let url = format!("addresses/balance/details/{}", address.as_ref());
         self.create_req_handler(self.get(url), "node::matcher_waves_balance")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
@@ -69,7 +68,7 @@ impl HttpClient<NodeApi> {
         &self,
         address: impl AsRef<str> + Send,
         asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> ApiResult<Option<MatcherBalances>> {
+    ) -> ApiResult<Option<dto::MatcherBalances>> {
         let url = format!("assets/balance/{}", address.as_ref());
         let asset_ids = asset_ids.into_iter().map(Into::into).collect::<Vec<_>>();
         let data = json!({ "ids": asset_ids });
@@ -82,7 +81,7 @@ impl HttpClient<NodeApi> {
     pub async fn assets_details(
         &self,
         assets: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> ApiResult<Option<Vec<AssetDetail>>> {
+    ) -> ApiResult<Option<Vec<dto::AssetDetail>>> {
         let url = format!(
             "assets/details?id={}",
             join(
@@ -102,6 +101,17 @@ impl HttpClient<NodeApi> {
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
             .execute()
             .await
+    }
+
+    pub async fn transaction_broadcast(&self, transaction: String) -> ApiResult<serde_json::Value> {
+        self.create_req_handler(
+            self.post("transactions/broadcast")
+                .header("Content-Type", "application/json")
+                .body(transaction.into_bytes()),
+            "node::transaction_broadcast",
+        )
+        .execute()
+        .await
     }
 }
 
@@ -236,6 +246,7 @@ pub mod tests {
 
 #[cfg(test)]
 mod tests_internal {
+    use super::dto::*;
     use super::tests::*;
     use super::*;
     use crate::tests::blockchains::{MAINNET, TESTNET};
