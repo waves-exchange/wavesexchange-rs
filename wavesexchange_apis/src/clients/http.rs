@@ -169,7 +169,7 @@ where
     RS: Into<String> + Clone + Send,
 {
     client: &'cli HttpClient<A>,
-    req: Option<RequestBuilder>,
+    req: RequestBuilder,
     req_info: RS,
     status_handlers: HashMap<StatusCodes, StatusHandler<T>>,
 }
@@ -183,7 +183,7 @@ where
     pub fn from_request(client: &'cli HttpClient<A>, req: RequestBuilder, req_info: RS) -> Self {
         let this = Self {
             client,
-            req: Some(req),
+            req,
             req_info,
             status_handlers: HashMap::new(),
         };
@@ -221,17 +221,15 @@ where
     }
 
     pub async fn execute(mut self) -> ApiResult<T> {
-        let req = self.req.take().unwrap();
-        let req_info = self.req_info.clone().into();
-        let resp = self.client.do_request(req, req_info).await?;
+        let resp = self.client.do_request(self.req, self.req_info).await?;
         let status = resp.status();
         let handler =
             if let Some(handler) = self.status_handlers.remove(&StatusCodes::Concrete(status)) {
                 handler
-            } else if let Some(default_handler) = self.status_handlers.remove(&StatusCodes::Other) {
-                default_handler
+            } else if let Some(handler) = self.status_handlers.remove(&StatusCodes::Other) {
+                handler
             } else {
-                unreachable!()
+                panic!("No appropriate handler for status {status}");
             };
         handler(resp).await
     }
