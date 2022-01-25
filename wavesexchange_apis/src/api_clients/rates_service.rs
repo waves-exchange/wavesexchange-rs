@@ -106,7 +106,7 @@ impl HttpClient<RatesSvcApi> {
         amount_asset_id: impl AsRef<str>,
         price_asset_id: impl AsRef<str>,
         days: Duration,
-    ) -> ApiResult<Vec<Option<BigDecimal>>> {
+    ) -> ApiResult<Vec<BigDecimal>> {
         let req = dto::RatesRequest {
             pairs: vec![format!(
                 "{}/{}",
@@ -140,7 +140,7 @@ impl HttpClient<RatesSvcApi> {
         &self,
         pairs: impl IntoIterator<Item = impl Into<String> + Debug> + Debug,
         days: Duration,
-    ) -> ApiResult<Vec<Vec<Option<BigDecimal>>>> {
+    ) -> ApiResult<Vec<Vec<BigDecimal>>> {
         let cache_key = format!("{pairs:?}");
         let req = dto::RatesRequest {
             pairs: pairs.into_iter().map(Into::into).collect(),
@@ -173,7 +173,7 @@ async fn cached_rates_response(
 #[derive(Clone, Debug)]
 pub struct Rate {
     pub heuristics: HashSet<String>,
-    pub rate: Option<BigDecimal>,
+    pub rate: BigDecimal,
     pub heuristic_rate: Option<BigDecimal>,
     pub exchange_rate: Option<BigDecimal>,
 }
@@ -207,7 +207,7 @@ pub mod dto {
 
     #[derive(Deserialize, Clone)]
     pub struct RateData {
-        pub rate: Option<BigDecimal>,
+        pub rate: BigDecimal,
         pub heuristic: Option<BigDecimal>,
         pub exchange: Option<BigDecimal>,
     }
