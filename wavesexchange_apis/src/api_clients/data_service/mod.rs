@@ -78,7 +78,7 @@ pub mod dto {
     }
 
     #[derive(Deserialize)]
-    pub(super) struct Data<T> {
+    pub struct Data<T> {
         pub data: T,
     }
 
@@ -103,28 +103,28 @@ pub mod dto {
     }
 
     #[derive(Debug, Deserialize)]
-    pub(super) struct RatesResponse {
+    pub struct RatesResponse {
         pub data: Vec<RateOuter>,
     }
 
     #[derive(Debug, Deserialize)]
-    pub(super) struct RateOuter {
+    pub struct RateOuter {
         pub data: Rate,
     }
 
     #[derive(Debug, Deserialize)]
-    pub(super) struct Rate {
+    pub struct Rate {
         pub rate: f64,
     }
 
     #[derive(Debug, Clone, Deserialize)]
-    pub(super) struct InvokeScriptTransactionResponse {
+    pub struct InvokeScriptTransactionResponse {
         pub data: InvokeScriptTransactionData,
     }
 
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub(super) struct InvokeScriptTransactionData {
+    pub struct InvokeScriptTransactionData {
         pub id: String,
         pub height: u32,
         // timestamp: NaiveDateTime, // todo
@@ -140,14 +140,14 @@ pub mod dto {
     }
 
     #[derive(Debug, Deserialize, Clone)]
-    pub(super) struct InvokeScriptCallResponse {
+    pub struct InvokeScriptCallResponse {
         pub function: String,
         pub args: Vec<InvokeScriptArgumentResponse>,
     }
 
     #[derive(Debug, Deserialize, Clone)]
     #[serde(tag = "type")]
-    pub(super) enum InvokeScriptArgumentResponse {
+    pub enum InvokeScriptArgumentResponse {
         #[serde(rename = "string")]
         String { value: String },
         #[serde(rename = "binary")]
@@ -155,50 +155,16 @@ pub mod dto {
     }
 
     #[derive(Debug, Clone, Deserialize)]
-    pub(super) struct GenericTransactionResponse {
+    pub struct GenericTransactionResponse {
         pub data: GenericTransactionData,
     }
 
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub(super) struct GenericTransactionData {
+    pub struct GenericTransactionData {
         pub id: String,
         pub height: u32,
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum InvokeScriptArgument {
-    String(String),
-    Binary(Vec<u8>),
-}
-
-#[derive(Debug, Clone)]
-pub struct InvokeScriptCall {
-    pub function: String,
-    pub args: Vec<InvokeScriptArgument>,
-}
-
-#[derive(Debug, Clone)]
-pub struct InvokeScriptTransaction {
-    pub id: String,
-    pub height: u32,
-    // timestamp: NaiveDateTime, // todo
-    pub proofs: Vec<String>,
-    pub version: u8,
-    //   application_status: TransactionApplicationStatus,
-    pub sender: String,
-    pub sender_public_key: String,
-    pub d_app: String,
-    pub call: InvokeScriptCall,
-    pub fee: f64,
-    // ...
-}
-
-#[derive(Debug, Clone)]
-pub struct GenericTransaction {
-    pub id: String,
-    pub height: u32,
 }
 
 // public exports for tests
@@ -208,6 +174,15 @@ pub mod tests {
 
     pub fn mainnet_client() -> HttpClient<DataSvcApi> {
         HttpClient::from_base_url(MAINNET::data_service_url)
+    }
+}
+
+impl core::fmt::Display for Sort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Sort::Asc => write!(f, "asc"),
+            Sort::Desc => write!(f, "desc"),
+        }
     }
 }
 

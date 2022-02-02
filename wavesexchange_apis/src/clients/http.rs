@@ -33,16 +33,14 @@ impl<A: BaseApi> HttpClient<A> {
         }
     }
 
-    pub fn get(&self, url: impl Into<String>) -> RequestBuilder {
+    pub fn http_get(&self, url: impl Into<String>) -> RequestBuilder {
         self.client.get(self.prepare_url(url))
     }
 
-    pub fn post(&self, url: impl Into<String>) -> RequestBuilder {
+    pub fn http_post(&self, url: impl Into<String>) -> RequestBuilder {
         self.client.post(self.prepare_url(url))
     }
 
-    /// `self.client` is private to prevent ambiguation in `self.get` vs `self.client.get`
-    /// so use this if you really need inner reqwest::Client
     pub fn get_client(&self) -> &Client {
         &self.client
     }
@@ -152,8 +150,7 @@ type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, Result<T,
 /// Optional helper struct for handling requests-responses
 ///
 /// ```no_run
-/// // call from HttpClient's method
-/// WXRequestHandler::from_request(self, self.get("search"), "search in my service")
+/// HttpClient::create_req_handler(self, self.http_get("search"), "search in my service")
 ///      // 200 OK has a default handler, you don't need to set it up explicitly all the time.
 ///      // Same for other statuses without explicit handlers (they have another default handler).
 ///     .handle_status_code(

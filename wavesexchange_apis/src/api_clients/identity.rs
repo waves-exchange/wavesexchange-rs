@@ -1,4 +1,4 @@
-use crate::{ApiResult, BaseApi, Error, HttpClient};
+use crate::{ApiResult, BaseApi, HttpClient};
 
 const AUTHORIZATION_HEADER: &str = "Authorization";
 
@@ -13,23 +13,16 @@ impl HttpClient<IdentityApi> {
         access_token: String,
         payload: String,
         signature: String,
-    ) -> ApiResult<String> {
+    ) -> ApiResult<dto::SignResponse> {
         let req = dto::SignRequest { payload, signature };
-
-        let resp: dto::SignResponse = self
-            .create_req_handler(
-                self.post("/api/v1/sign")
-                    .json(&req)
-                    .header(AUTHORIZATION_HEADER, access_token),
-                "identity::sign",
-            )
-            .execute()
-            .await?;
-
-        let signature_bytes =
-            base64::decode(resp.signature).map_err(|e| Error::ResponseParseError(e.to_string()))?;
-        let signature_base58 = bs58::encode(signature_bytes).into_string();
-        Ok(signature_base58)
+        self.create_req_handler(
+            self.http_post("/api/v1/sign")
+                .json(&req)
+                .header(AUTHORIZATION_HEADER, access_token),
+            "identity::sign",
+        )
+        .execute()
+        .await
     }
 }
 
@@ -43,7 +36,7 @@ pub mod dto {
     }
 
     #[derive(Debug, Deserialize)]
-    pub(super) struct SignResponse {
+    pub struct SignResponse {
         pub signature: String,
     }
 }

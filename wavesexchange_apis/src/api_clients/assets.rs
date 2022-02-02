@@ -8,39 +8,22 @@ pub struct AssetsSvcApi;
 
 impl BaseApi for AssetsSvcApi {}
 
-pub struct AssetInfo {
-    pub id: String,
-    pub quantity: i64,
-}
-
 impl HttpClient<AssetsSvcApi> {
-    pub async fn get_assets(
+    pub async fn get(
         &self,
         asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
         height: Option<u32>,
-    ) -> ApiResult<Vec<AssetInfo>> {
+    ) -> ApiResult<dto::AssetResponse> {
         let url = match build_url(&self.base_url(), asset_ids, height) {
             Some(u) => u,
-            None => return Ok(vec![]),
+            None => return Ok(dto::AssetResponse { data: vec![] }),
         };
 
         timer!("AssetService query");
 
-        let resp: dto::AssetResponse = self
-            .create_req_handler(self.get_client().get(&url), "assets::get_assets")
+        self.create_req_handler(self.get_client().get(&url), "assets::get_assets")
             .execute()
-            .await?;
-
-        let res = resp
-            .data
-            .into_iter()
-            .map(|asset_data| AssetInfo {
-                id: asset_data.data.id,
-                quantity: asset_data.data.quantity,
-            })
-            .collect();
-
-        Ok(res)
+            .await
     }
 }
 
@@ -48,17 +31,17 @@ pub mod dto {
     use serde::Deserialize;
 
     #[derive(Deserialize)]
-    pub(super) struct AssetResponse {
+    pub struct AssetResponse {
         pub data: Vec<AssetData>,
     }
 
     #[derive(Deserialize)]
-    pub(super) struct AssetData {
+    pub struct AssetData {
         pub data: Asset,
     }
 
     #[derive(Deserialize)]
-    pub(super) struct Asset {
+    pub struct Asset {
         pub id: String,
         pub quantity: i64,
     }

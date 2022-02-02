@@ -10,7 +10,7 @@ impl BaseApi for TransfersApi {}
 
 impl HttpClient<TransfersApi> {
     #[async_recursion]
-    pub async fn search(&self, req: SearchTransfersRequest) -> ApiResult<Vec<Transfer>> {
+    pub async fn get(&self, req: SearchTransfersRequest) -> ApiResult<List<dto::TransferResponse>> {
         let mut query_params = vec![];
 
         if let Some(senders) = &req.senders {
@@ -63,22 +63,9 @@ impl HttpClient<TransfersApi> {
 
         let request_url = format!("transfers?{}", query_params.join("&"));
 
-        let response: List<dto::TransferResponse> = self
-            .create_req_handler(self.get(&request_url), "transfers::search")
+        self.create_req_handler(self.http_get(&request_url), "transfers::get")
             .execute()
-            .await?;
-
-        let mut transfers: Vec<Transfer> =
-            response.clone().items.iter().map(|t| t.into()).collect();
-
-        if transfers.len() < req.limit.unwrap_or(0) as usize && response.page_info.has_next_page {
-            let mut req = req.clone();
-            req.after = response.page_info.last_cursor;
-            let mut rest_transfers = self.search(req).await?;
-            transfers.append(&mut rest_transfers);
-        }
-
-        Ok(transfers)
+            .await
     }
 }
 

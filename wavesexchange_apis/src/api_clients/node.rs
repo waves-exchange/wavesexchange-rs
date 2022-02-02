@@ -1,4 +1,3 @@
-use crate::models::DataEntryValue;
 use crate::{ApiResult, BaseApi, HttpClient};
 use itertools::join;
 use reqwest::StatusCode;
@@ -14,57 +13,54 @@ impl HttpClient<NodeApi> {
         &self,
         address: impl AsRef<str> + Send,
         keys: impl IntoIterator<Item = impl Into<String>> + Send,
-    ) -> ApiResult<Vec<dto::DataEntry>> {
+    ) -> ApiResult<Vec<dto::DataEntryResponse>> {
         let body = dto::StateRequest {
             keys: keys.into_iter().map(Into::into).collect(),
         };
         let endpoint_url = format!("addresses/data/{}", address.as_ref());
 
-        let resp: Vec<dto::DataEntryResponse> = self
-            .create_req_handler(self.post(&endpoint_url).json(&body), "node::data_entries")
-            .execute()
-            .await?;
-
-        Ok(resp.into_iter().map(Into::into).collect())
+        self.create_req_handler(
+            self.http_post(&endpoint_url).json(&body),
+            "node::data_entries",
+        )
+        .execute()
+        .await
     }
 
     pub async fn evaluate(
         &self,
-        dapp: impl AsRef<str> + Send,
-        expression: impl AsRef<str> + Send,
+        dapp: impl AsRef<str>,
+        expression: impl AsRef<str>,
     ) -> ApiResult<dto::Value> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
 
         let resp: dto::EvaluateResponse = self
-            .create_req_handler(self.post(&endpoint_url).json(&body), "node::evaluate")
+            .create_req_handler(self.http_post(&endpoint_url).json(&body), "node::evaluate")
             .execute()
             .await?;
 
         Ok(resp.result)
     }
 
-    pub async fn get_last_height(&self) -> ApiResult<i32> {
-        let r: dto::LastHeight = self
-            .create_req_handler(self.get("blocks/height"), "node::get_last_height")
+    pub async fn get_last_height(&self) -> ApiResult<dto::LastHeight> {
+        self.create_req_handler(self.http_get("blocks/height"), "node::get_last_height")
             .execute()
-            .await?;
-
-        Ok(r.height)
+            .await
     }
 
-    pub async fn matcher_waves_balance(
+    pub async fn addr_balance_details(
         &self,
-        address: impl AsRef<str> + Send,
+        address: impl AsRef<str>,
     ) -> ApiResult<Option<dto::MatcherWavesBalance>> {
         let url = format!("addresses/balance/details/{}", address.as_ref());
-        self.create_req_handler(self.get(url), "node::matcher_waves_balance")
+        self.create_req_handler(self.http_get(url), "node::addr_balance_details")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
             .execute()
             .await
     }
 
-    pub async fn balances_on_matcher(
+    pub async fn assets_balance(
         &self,
         address: impl AsRef<str> + Send,
         asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
@@ -72,7 +68,7 @@ impl HttpClient<NodeApi> {
         let url = format!("assets/balance/{}", address.as_ref());
         let asset_ids = asset_ids.into_iter().map(Into::into).collect::<Vec<_>>();
         let data = json!({ "ids": asset_ids });
-        self.create_req_handler(self.post(url).json(&data), "node::balances_on_matcher")
+        self.create_req_handler(self.http_post(url).json(&data), "node::assets_balance")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
             .execute()
             .await
@@ -97,7 +93,7 @@ impl HttpClient<NodeApi> {
             )
         );
 
-        self.create_req_handler(self.get(url), "node::assets_details")
+        self.create_req_handler(self.http_get(url), "node::assets_details")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
             .execute()
             .await
@@ -105,7 +101,7 @@ impl HttpClient<NodeApi> {
 
     pub async fn transaction_broadcast(&self, transaction: String) -> ApiResult<serde_json::Value> {
         self.create_req_handler(
-            self.post("transactions/broadcast")
+            self.http_post("transactions/broadcast")
                 .header("Content-Type", "application/json")
                 .body(transaction.into_bytes()),
             "node::transaction_broadcast",
@@ -116,7 +112,6 @@ impl HttpClient<NodeApi> {
 }
 
 pub mod dto {
-    use super::*;
     use bigdecimal::BigDecimal;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
@@ -148,7 +143,7 @@ pub mod dto {
     }
 
     #[derive(Debug, Clone, Deserialize)]
-    pub(super) struct LastHeight {
+    pub struct LastHeight {
         pub height: i32,
     }
 
@@ -157,34 +152,13 @@ pub mod dto {
         pub keys: Vec<String>,
     }
 
-    #[derive(Debug, Clone, Deserialize)]
-    pub struct DataEntry {
-        pub key: String,
-        pub value: DataEntryValue,
-    }
-
     #[derive(Debug, Deserialize)]
     #[serde(tag = "type")]
-    pub(super) enum DataEntryResponse {
+    pub enum DataEntryResponse {
         #[serde(rename = "string")]
         String { key: String, value: String },
         #[serde(rename = "integer")]
         Integer { key: String, value: i64 },
-    }
-
-    impl From<DataEntryResponse> for DataEntry {
-        fn from(de: DataEntryResponse) -> Self {
-            match de {
-                DataEntryResponse::String { key: k, value: v } => DataEntry {
-                    key: k,
-                    value: DataEntryValue::String(v),
-                },
-                DataEntryResponse::Integer { key: k, value: v } => DataEntry {
-                    key: k,
-                    value: DataEntryValue::Integer(v),
-                },
-            }
-        }
     }
 
     #[derive(Debug, Deserialize)]

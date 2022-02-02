@@ -1,5 +1,4 @@
 use crate::{ApiResult, BaseApi, HttpClient};
-use bigdecimal::ToPrimitive;
 use wavesexchange_warp::pagination::List;
 
 #[derive(Clone, Debug)]
@@ -8,33 +7,11 @@ pub struct LiquidityPoolsApi;
 impl BaseApi for LiquidityPoolsApi {}
 
 impl HttpClient<LiquidityPoolsApi> {
-    pub async fn stats(&self, asset_id: Option<&str>) -> ApiResult<Vec<LiquidityPoolBrief>> {
-        let response: List<dto::LiquidityPoolStats> = self
-            .create_req_handler(self.get("stats"), "liquidity_pools::stats")
+    pub async fn stats(&self) -> ApiResult<List<dto::LiquidityPoolStats>> {
+        self.create_req_handler(self.http_get("stats"), "liquidity_pools::stats")
             .execute()
-            .await?;
-        let pools = response.items.iter();
-        Ok(match asset_id {
-            Some(asset) => pools
-                .filter_map(|lps| {
-                    if &lps.pool_lp_asset_id == asset {
-                        Some(lps.into())
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-            None => pools.map(LiquidityPoolBrief::from).collect(),
-        })
+            .await
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct LiquidityPoolBrief {
-    pub pool_lp_asset_id: String,
-    pub reward_apy_min: f64,
-    pub reward_apy_max: f64,
-    pub base_apy_1d: f64,
 }
 
 pub mod dto {
@@ -84,23 +61,5 @@ pub mod dto {
         Days30,
         #[serde(rename = "inf")]
         Infinity,
-    }
-}
-
-impl From<&dto::LiquidityPoolStats> for LiquidityPoolBrief {
-    fn from(lps: &dto::LiquidityPoolStats) -> Self {
-        LiquidityPoolBrief {
-            pool_lp_asset_id: lps.pool_lp_asset_id.clone(),
-            reward_apy_min: lps.reward_apy_min.to_f64().unwrap_or_default(),
-            reward_apy_max: lps.reward_apy_max.to_f64().unwrap_or_default(),
-            base_apy_1d: lps
-                .base_apys
-                .iter()
-                .find(|apy| apy.interval == dto::Interval::Day1)
-                .unwrap()
-                .base_apy
-                .to_f64()
-                .unwrap_or_default(),
-        }
     }
 }

@@ -1,8 +1,4 @@
-use crate::models::assets::{AssetId, LeveragedPairId};
-use crate::{ApiResult, BaseApi, Error, HttpClient};
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
+use crate::{ApiResult, BaseApi, HttpClient};
 
 #[derive(Clone, Debug)]
 pub struct LevexApi;
@@ -10,122 +6,10 @@ pub struct LevexApi;
 impl BaseApi for LevexApi {}
 
 impl HttpClient<LevexApi> {
-    pub async fn leveraged_tokens_summary(&self) -> ApiResult<Pairs> {
-        let resp: dto::SummaryResponse = self
-            .create_req_handler(self.get("summary"), "levex::leveraged_tokens_summary")
+    pub async fn leveraged_tokens_summary(&self) -> ApiResult<dto::SummaryResponse> {
+        self.create_req_handler(self.http_get("summary"), "levex::leveraged_tokens_summary")
             .execute()
-            .await?;
-
-        Ok(resp
-            .try_into()
-            .map_err(|e| Error::ResponseParseError(format!("bad number: {:?}", e)))?)
-    }
-}
-
-#[derive(Clone)]
-pub struct Pairs(pub HashMap<PairId, Pair>);
-
-pub type PairId = LeveragedPairId;
-
-#[derive(Clone)]
-pub struct Pair {
-    pub pair_id: PairId,
-    pub bear_id: AssetId,
-    pub bull_id: AssetId,
-    pub pool_id: String,
-    pub leverage_factor: u64,
-    pub max_issue_bull: u64,
-    pub max_issue_bear: u64,
-    pub current_price: PricePair,
-    pub previous_price: PricePair,
-}
-
-#[derive(Clone)]
-pub struct PricePair {
-    pub bear: Price,
-    pub bull: Price,
-    pub price_index: u64,
-    pub timestamp: u64,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Price {
-    pub collateral: u64,
-    pub circulation: u64,
-}
-
-impl TryFrom<dto::SummaryResponse> for Pairs {
-    type Error = <u64 as FromStr>::Err;
-
-    fn try_from(value: dto::SummaryResponse) -> Result<Self, Self::Error> {
-        let pairs = value
-            .pairs
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<Pair>, _>>()?
-            .into_iter()
-            .map(|pair| (pair.pair_id.clone(), pair))
-            .collect();
-        Ok(Pairs(pairs))
-    }
-}
-
-impl TryFrom<dto::Pair> for Pair {
-    type Error = <u64 as FromStr>::Err;
-
-    fn try_from(value: dto::Pair) -> Result<Self, Self::Error> {
-        let [current_price, previous_price] = value.price_change;
-        Ok(Pair {
-            pair_id: value.pair_id,
-            bear_id: value.bear_id,
-            bull_id: value.bull_id,
-            pool_id: value.pool_id,
-            leverage_factor: value.leverage_factor,
-            max_issue_bull: value.max_issue_bull.parse()?,
-            max_issue_bear: value.max_issue_bear.parse()?,
-            current_price: current_price.try_into()?,
-            previous_price: previous_price.try_into()?,
-        })
-    }
-}
-
-impl TryFrom<dto::PricePair> for PricePair {
-    type Error = <u64 as FromStr>::Err;
-
-    fn try_from(value: dto::PricePair) -> Result<Self, Self::Error> {
-        Ok(PricePair {
-            bear: value.bear.try_into()?,
-            bull: value.bull.try_into()?,
-            price_index: value.price_index,
-            timestamp: value.timestamp,
-        })
-    }
-}
-
-impl TryFrom<[String; 2]> for Price {
-    type Error = <u64 as FromStr>::Err;
-
-    fn try_from(value: [String; 2]) -> Result<Self, Self::Error> {
-        Ok(Price {
-            collateral: value[0].parse()?,
-            circulation: value[1].parse()?,
-        })
-    }
-}
-
-impl Price {
-    #[cfg(test)]
-    pub fn new(collateral: u64, circulation: u64) -> Self {
-        Price {
-            collateral,
-            circulation,
-        }
-    }
-
-    pub fn as_f64(&self) -> f64 {
-        let collateral = self.collateral as f64;
-        let circulation = self.circulation as f64;
-        collateral / circulation
+            .await
     }
 }
 
@@ -135,14 +19,14 @@ pub mod dto {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub(super) struct SummaryResponse {
+    pub struct SummaryResponse {
         pub pairs: Vec<Pair>,
         pub config: Config,
     }
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub(super) struct Pair {
+    pub struct Pair {
         pub pair_id: String,
         pub bear_id: String,
         pub bull_id: String,
@@ -155,7 +39,7 @@ pub mod dto {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub(super) struct PricePair {
+    pub struct PricePair {
         pub bear: [String; 2],
         pub bull: [String; 2],
         pub price_index: u64,
@@ -164,7 +48,7 @@ pub mod dto {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub(super) struct Config {
+    pub struct Config {
         pub usdn_pacemaker_fee: u64,
         pub waves_pacemaker_fee: u64,
         pub issue_percentile: u64,
