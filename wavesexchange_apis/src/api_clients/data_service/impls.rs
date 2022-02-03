@@ -104,7 +104,7 @@ impl HttpClient<DataSvcApi> {
         sort: Sort,
         limit: usize,
         after: Option<impl AsRef<str>>,
-    ) -> ApiResult<DSList<dto::ExchangeTransaction>> {
+    ) -> ApiResult<DSList<dto::Data<dto::ExchangeTransaction>>> {
         let query_string = serde_qs::to_string(&dto::ExchangeTransactionsQueryParams {
             amount_asset: amount_asset_id.map(|id| id.as_ref().to_owned()),
             price_asset: price_asset_id.map(|id| id.as_ref().to_owned()),
