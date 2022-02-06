@@ -54,13 +54,16 @@ impl HttpClient<StateSvcApi> {
     pub async fn search(
         &self,
         query: impl Into<serde_json::Value>,
+        sort: Option<impl Into<serde_json::Value>>,
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> ApiResult<dto::StateSearchResult> {
+        let sort = sort.map(Into::into).unwrap_or_else(|| json!([]));
         let limit = limit.unwrap_or(1000);
         let offset = offset.unwrap_or(0);
 
         let mut qv: serde_json::Value = query.into();
+        qv["sort"] = sort;
         qv["limit"] = json!(limit);
         qv["offset"] = json!(offset);
 
