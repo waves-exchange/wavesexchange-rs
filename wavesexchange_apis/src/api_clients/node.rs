@@ -11,8 +11,8 @@ impl BaseApi for NodeApi {}
 impl HttpClient<NodeApi> {
     pub async fn data_entries(
         &self,
-        address: impl AsRef<str> + Send,
-        keys: impl IntoIterator<Item = impl Into<String>> + Send,
+        address: impl AsRef<str>,
+        keys: impl IntoIterator<Item = impl Into<String>>,
     ) -> ApiResult<Vec<dto::DataEntryResponse>> {
         let body = dto::StateRequest {
             keys: keys.into_iter().map(Into::into).collect(),
@@ -62,8 +62,8 @@ impl HttpClient<NodeApi> {
 
     pub async fn assets_balance(
         &self,
-        address: impl AsRef<str> + Send,
-        asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
+        address: impl AsRef<str>,
+        asset_ids: impl IntoIterator<Item = impl Into<String>>,
     ) -> ApiResult<Option<dto::MatcherBalances>> {
         let url = format!("assets/balance/{}", address.as_ref());
         let asset_ids = asset_ids.into_iter().map(Into::into).collect::<Vec<_>>();
@@ -76,7 +76,7 @@ impl HttpClient<NodeApi> {
 
     pub async fn assets_details(
         &self,
-        assets: impl IntoIterator<Item = impl Into<String>> + Send,
+        assets: impl IntoIterator<Item = impl Into<String>>,
     ) -> ApiResult<Option<Vec<dto::AssetDetail>>> {
         let url = format!(
             "assets/details?id={}",

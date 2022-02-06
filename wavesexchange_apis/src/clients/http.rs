@@ -2,6 +2,7 @@ use crate::{error, ApiResult, BaseApi, Error};
 use futures::{future::BoxFuture, Future};
 use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use wavesexchange_log::debug;
@@ -45,10 +46,10 @@ impl<A: BaseApi> HttpClient<A> {
         &self.client
     }
 
-    pub fn base_url(&self) -> String {
+    pub fn base_url(&self) -> Cow<'_, str> {
         match &self.base_url {
-            Some(s) => s.clone(),
-            None => String::new(),
+            Some(s) => Cow::Borrowed(s),
+            None => Cow::Owned(String::new()),
         }
     }
 
@@ -226,6 +227,7 @@ where
             } else if let Some(handler) = self.status_handlers.remove(&StatusCodes::Other) {
                 handler
             } else {
+                // if invariants above are not satisfied, then something really bad happened
                 panic!("No appropriate handler for status {status}");
             };
         handler(resp).await

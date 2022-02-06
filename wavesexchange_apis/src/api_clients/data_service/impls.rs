@@ -7,9 +7,8 @@ const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
 
 impl HttpClient<DataSvcApi> {
     pub async fn rates<
-        S: Into<String>,
-        I: IntoIterator<Item = (S, S)> + Send,
-        S1: AsRef<str> + Send,
+        I: IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
+        S1: AsRef<str>,
     >(
         &self,
         matcher_address: S1,
@@ -38,9 +37,9 @@ impl HttpClient<DataSvcApi> {
 
     pub async fn invoke_script_transactions(
         &self,
-        dapp: impl AsRef<str> + Send,
-        function: impl AsRef<str> + Send,
-        timestamp_lt: impl Into<NaiveDateTime> + Send,
+        dapp: impl AsRef<str>,
+        function: impl AsRef<str>,
+        timestamp_lt: impl Into<NaiveDateTime>,
         // timestamp_gte: NaiveDateTime,
         sort: Sort,
         limit: usize,
@@ -65,8 +64,8 @@ impl HttpClient<DataSvcApi> {
 
     pub async fn last_exchange_transaction_to_date(
         &self,
-        sender: impl AsRef<str> + Send,
-        timestamp: impl Into<NaiveDateTime> + Send,
+        sender: impl AsRef<str>,
+        timestamp: impl Into<NaiveDateTime>,
     ) -> ApiResult<DSList<dto::GenericTransactionResponse>> {
         let url = format!(
             "transactions/exchange?sender={}&timeEnd={:?}&limit=1",

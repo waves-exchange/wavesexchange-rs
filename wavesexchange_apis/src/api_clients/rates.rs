@@ -9,7 +9,7 @@ impl BaseApi for RatesSvcApi {}
 impl HttpClient<RatesSvcApi> {
     pub async fn rates(
         &self,
-        asset_pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)> + Send,
+        asset_pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
     ) -> ApiResult<dto::RatesResponse> {
         let pairs = asset_pairs
             .into_iter()

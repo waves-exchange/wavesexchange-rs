@@ -11,7 +11,7 @@ impl BaseApi for AssetsSvcApi {}
 impl HttpClient<AssetsSvcApi> {
     pub async fn get(
         &self,
-        asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
+        asset_ids: impl IntoIterator<Item = impl Into<String>>,
         height: Option<u32>,
     ) -> ApiResult<dto::AssetResponse> {
         let url = match build_url(&self.base_url(), asset_ids, height) {
@@ -49,7 +49,7 @@ pub mod dto {
 
 fn build_url(
     root_url: &str,
-    asset_ids: impl IntoIterator<Item = impl Into<String>> + Send,
+    asset_ids: impl IntoIterator<Item = impl Into<String>>,
     height: Option<u32>,
 ) -> Option<String> {
     let asset_ids = asset_ids
