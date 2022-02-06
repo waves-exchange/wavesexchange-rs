@@ -21,13 +21,6 @@ impl HttpClient<TransfersApi> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Transfer {
-    pub asset_id: String,
-    pub amount: i64,
-    pub attachment_utf8: Option<String>,
-}
-
 pub mod dto {
     use chrono::{DateTime, FixedOffset, Utc};
     use serde::{Deserialize, Serialize};
