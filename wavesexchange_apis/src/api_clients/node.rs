@@ -31,16 +31,13 @@ impl HttpClient<NodeApi> {
         &self,
         dapp: impl AsRef<str>,
         expression: impl AsRef<str>,
-    ) -> ApiResult<dto::Value> {
+    ) -> ApiResult<dto::EvaluateResponse> {
         let endpoint_url = format!("utils/script/evaluate/{}", dapp.as_ref());
         let body = json!({ "expr": expression.as_ref() });
 
-        let resp: dto::EvaluateResponse = self
-            .create_req_handler(self.http_post(&endpoint_url).json(&body), "node::evaluate")
+        self.create_req_handler(self.http_post(&endpoint_url).json(&body), "node::evaluate")
             .execute()
-            .await?;
-
-        Ok(resp.result)
+            .await
     }
 
     pub async fn get_last_height(&self) -> ApiResult<dto::LastHeight> {
@@ -162,7 +159,7 @@ pub mod dto {
     }
 
     #[derive(Debug, Deserialize)]
-    pub(super) struct EvaluateResponse {
+    pub struct EvaluateResponse {
         pub result: Value,
     }
 
@@ -251,7 +248,7 @@ mod tests_internal {
             .await
             .unwrap();
 
-        match result {
+        match result.result {
             Value::Tuple { value } => {
                 let price = match value.get("_1") {
                     Some(Value::IntegerEntry {
