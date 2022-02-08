@@ -151,7 +151,10 @@ mod tests_internal {
             }
         });
 
-        let entries = mainnet_client().search(query, None, None).await.unwrap();
+        let entries = mainnet_client()
+            .search(query, None, None, None)
+            .await
+            .unwrap();
 
         assert_eq!(entries.len(), 1);
     }

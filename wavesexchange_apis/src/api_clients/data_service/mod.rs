@@ -77,7 +77,7 @@ pub mod dto {
         Sell,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Serialize, Deserialize)]
     pub struct Data<T> {
         pub data: T,
     }
@@ -117,12 +117,12 @@ pub mod dto {
         pub rate: f64,
     }
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct InvokeScriptTransactionResponse {
         pub data: InvokeScriptTransactionData,
     }
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct InvokeScriptTransactionData {
         pub id: String,
@@ -139,13 +139,13 @@ pub mod dto {
         // ...
     }
 
-    #[derive(Debug, Deserialize, Clone)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct InvokeScriptCallResponse {
         pub function: String,
         pub args: Vec<InvokeScriptArgumentResponse>,
     }
 
-    #[derive(Debug, Deserialize, Clone)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     #[serde(tag = "type")]
     pub enum InvokeScriptArgumentResponse {
         #[serde(rename = "string")]
@@ -154,12 +154,12 @@ pub mod dto {
         Binary { value: String },
     }
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct GenericTransactionResponse {
         pub data: GenericTransactionData,
     }
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct GenericTransactionData {
         pub id: String,

@@ -146,7 +146,7 @@ impl From<StatusCode> for StatusCodes {
     }
 }
 
-type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, Result<T, Error>> + Send>;
+type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult<T>> + Send>;
 
 /// Optional helper struct for handling requests-responses
 ///

@@ -1,6 +1,9 @@
 use super::{dto, DSList, DataSvcApi, Sort};
 use crate::{ApiResult, HttpClient};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use wavesexchange_warp::pagination::{List, PageInfo};
 
 const HEADER_ORIGIN_NAME: &str = "Origin";
 const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
@@ -43,7 +46,7 @@ impl HttpClient<DataSvcApi> {
         // timestamp_gte: NaiveDateTime,
         sort: Sort,
         limit: usize,
-    ) -> ApiResult<DSList<dto::InvokeScriptTransactionResponse>> {
+    ) -> ApiResult<List<dto::InvokeScriptTransactionResponse>> {
         let url = format!(
             "transactions/invoke-script?dapp={}&function={}&timeEnd={:?}&sort={}&limit={}",
             dapp.as_ref(),
@@ -53,33 +56,35 @@ impl HttpClient<DataSvcApi> {
             limit,
         );
 
-        self.create_req_handler(
+        self.create_req_handler::<DSList<dto::InvokeScriptTransactionResponse>, _>(
             self.http_get(&url)
                 .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
             "data_service::invoke_script_transactions",
         )
         .execute()
         .await
+        .map(List::from)
     }
 
     pub async fn last_exchange_transaction_to_date(
         &self,
         sender: impl AsRef<str>,
         timestamp: impl Into<NaiveDateTime>,
-    ) -> ApiResult<DSList<dto::GenericTransactionResponse>> {
+    ) -> ApiResult<List<dto::GenericTransactionResponse>> {
         let url = format!(
             "transactions/exchange?sender={}&timeEnd={:?}&limit=1",
             sender.as_ref(),
             timestamp.into(),
         );
 
-        self.create_req_handler(
+        self.create_req_handler::<DSList<dto::GenericTransactionResponse>, _>(
             self.http_get(&url)
                 .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
             "data_service::last_exchange_transaction_to_date",
         )
         .execute()
         .await
+        .map(List::from)
     }
 
     pub async fn asset_by_ticker(
@@ -103,7 +108,7 @@ impl HttpClient<DataSvcApi> {
         sort: Sort,
         limit: usize,
         after: Option<impl AsRef<str>>,
-    ) -> ApiResult<DSList<dto::Data<dto::ExchangeTransaction>>> {
+    ) -> ApiResult<List<dto::Data<dto::ExchangeTransaction>>> {
         let query_string = serde_qs::to_string(&dto::ExchangeTransactionsQueryParams {
             amount_asset: amount_asset_id.map(|id| id.as_ref().to_owned()),
             price_asset: price_asset_id.map(|id| id.as_ref().to_owned()),
@@ -118,8 +123,24 @@ impl HttpClient<DataSvcApi> {
 
         let url = format!("transactions/exchange?{query_string}");
 
-        self.create_req_handler(self.http_get(&url), "data_service::transactions_exchange")
-            .execute()
-            .await
+        self.create_req_handler::<DSList<dto::Data<dto::ExchangeTransaction>>, _>(
+            self.http_get(&url),
+            "data_service::transactions_exchange",
+        )
+        .execute()
+        .await
+        .map(List::from)
+    }
+}
+
+impl<T: Serialize + DeserializeOwned> From<DSList<T>> for List<T> {
+    fn from(dsl: DSList<T>) -> Self {
+        List {
+            page_info: PageInfo {
+                has_next_page: !dsl.is_last_page,
+                last_cursor: dsl.last_cursor,
+            },
+            items: dsl.data,
+        }
     }
 }
