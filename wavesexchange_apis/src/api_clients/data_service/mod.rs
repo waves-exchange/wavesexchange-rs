@@ -4,9 +4,9 @@ use self::dto::*;
 use crate::{BaseApi, HttpClient};
 
 #[derive(Clone, Debug)]
-pub struct DataSvcApi;
+pub struct DataService;
 
-impl BaseApi for DataSvcApi {}
+impl BaseApi for DataService {}
 
 pub mod dto {
     use chrono::{DateTime, NaiveDateTime, Utc};
@@ -172,7 +172,7 @@ pub mod tests {
     use super::*;
     use crate::tests::blockchains::MAINNET;
 
-    pub fn mainnet_client() -> HttpClient<DataSvcApi> {
+    pub fn mainnet_client() -> HttpClient<DataService> {
         HttpClient::from_base_url(MAINNET::data_service_url)
     }
 }

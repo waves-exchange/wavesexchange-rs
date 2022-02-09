@@ -1,11 +1,11 @@
 use crate::{ApiResult, BaseApi, HttpClient};
 
 #[derive(Clone, Debug)]
-pub struct InterestSvcApi;
+pub struct InterestService;
 
-impl BaseApi for InterestSvcApi {}
+impl BaseApi for InterestService {}
 
-impl HttpClient<InterestSvcApi> {
+impl HttpClient<InterestService> {
     pub async fn get(&self, asset_id: impl AsRef<str>) -> ApiResult<dto::InterestRatesResponse> {
         let url = format!("interest_rates/{}", asset_id.as_ref());
 

@@ -12,19 +12,19 @@ pub mod rates;
 pub mod state;
 pub mod transfers;
 
-pub use assets::AssetsSvcApi;
-pub use blockchain_updates::BlockchainUpdApi;
-pub use data_service::DataSvcApi;
-pub use identity::IdentityApi;
-pub use interest_rates::InterestSvcApi;
-pub use levex::LevexApi;
-pub use liquidity_pools::LiquidityPoolsApi;
-pub use matcher::MatcherApi;
-pub use node::NodeApi;
-pub use rate_aggregates::RateAggregatesApi;
-pub use rates::RatesSvcApi;
-pub use state::StateSvcApi;
-pub use transfers::TransfersApi;
+pub use assets::AssetsService;
+pub use blockchain_updates::BlockchainUpdates;
+pub use data_service::DataService;
+pub use identity::Identity;
+pub use interest_rates::InterestService;
+pub use levex::Levex;
+pub use liquidity_pools::LiquidityPools;
+pub use matcher::Matcher;
+pub use node::Node;
+pub use rate_aggregates::RateAggregates;
+pub use rates::RatesService;
+pub use state::StateService;
+pub use transfers::Transfers;
 
 use std::fmt::Debug;
 

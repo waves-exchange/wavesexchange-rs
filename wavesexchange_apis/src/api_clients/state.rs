@@ -11,11 +11,11 @@ pub enum HistoryPeg {
 }
 
 #[derive(Clone, Debug)]
-pub struct StateSvcApi;
+pub struct StateService;
 
-impl BaseApi for StateSvcApi {}
+impl BaseApi for StateService {}
 
-impl HttpClient<StateSvcApi> {
+impl HttpClient<StateService> {
     pub async fn entries(
         &self,
         address: impl AsRef<str>,
@@ -97,11 +97,11 @@ pub mod tests {
     use crate::tests::blockchains::MAINNET;
     use crate::tests::blockchains::TESTNET;
 
-    pub fn mainnet_client() -> HttpClient<StateSvcApi> {
+    pub fn mainnet_client() -> HttpClient<StateService> {
         HttpClient::from_base_url(MAINNET::state_service_url)
     }
 
-    pub fn testnet_client() -> HttpClient<StateSvcApi> {
+    pub fn testnet_client() -> HttpClient<StateService> {
         HttpClient::from_base_url(TESTNET::state_service_url)
     }
 }

@@ -194,7 +194,7 @@ where
         handler: impl FnOnce(Response) -> Fut + Send + 'static,
     ) -> Self
     where
-        Fut: Future<Output = Result<T, Error>> + Send + 'static,
+        Fut: Future<Output = ApiResult<T>> + Send + 'static,
     {
         self.status_handlers
             .insert(code.into(), Box::new(move |resp| Box::pin(handler(resp))));
@@ -206,9 +206,13 @@ where
         self = self.handle_status_code(
             StatusCodes::Concrete(StatusCode::OK),
             move |resp| async move {
-                resp.json()
+                let response = resp
+                    .text()
                     .await
-                    .map_err(|err| error::json_error(err, req_info.clone()))
+                    .map_err(|err| Error::ResponseParseError(err.to_string()))?;
+                serde_json::from_str(&response).map_err(|err| {
+                    error::json_error(err.to_string().as_ref(), req_info.clone(), &response)
+                })
             },
         );
 
@@ -228,7 +232,7 @@ where
                 handler
             } else {
                 // if invariants above are not satisfied, then something really bad happened
-                panic!("No appropriate handler for status {status}");
+                unreachable!("No appropriate handler for status {status} found");
             };
         handler(resp).await
     }

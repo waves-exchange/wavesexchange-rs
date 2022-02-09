@@ -13,11 +13,11 @@ use waves_protobuf_schemas::waves::events::{
 };
 
 #[derive(Clone, Debug)]
-pub struct BlockchainUpdApi;
+pub struct BlockchainUpdates;
 
-impl BaseApi for BlockchainUpdApi {}
+impl BaseApi for BlockchainUpdates {}
 
-impl GrpcClient<BlockchainUpdApi> {
+impl GrpcClient<BlockchainUpdates> {
     pub async fn fetch_transactions_at_height(
         &self,
         height: u32,

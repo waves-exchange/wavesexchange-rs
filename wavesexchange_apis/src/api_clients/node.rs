@@ -4,11 +4,11 @@ use reqwest::StatusCode;
 use serde_json::json;
 
 #[derive(Clone, Debug)]
-pub struct NodeApi;
+pub struct Node;
 
-impl BaseApi for NodeApi {}
+impl BaseApi for Node {}
 
-impl HttpClient<NodeApi> {
+impl HttpClient<Node> {
     pub async fn data_entries(
         &self,
         address: impl AsRef<str>,
@@ -210,7 +210,7 @@ pub mod tests {
     use super::*;
     use crate::tests::blockchains::MAINNET;
 
-    pub fn mainnet_client() -> HttpClient<NodeApi> {
+    pub fn mainnet_client() -> HttpClient<Node> {
         HttpClient::from_base_url(MAINNET::node_url)
     }
 }
@@ -240,7 +240,7 @@ mod tests_internal {
 
     #[tokio::test]
     async fn evaluate() {
-        let result = HttpClient::<NodeApi>::from_base_url(TESTNET::node_url)
+        let result = HttpClient::<Node>::from_base_url(TESTNET::node_url)
             .evaluate(
                 &TESTNET::products[0].contract_address,
                 "privateCurrentSysParamsREST(\"5Sh9KghfkZyhjwuodovDhB6PghDUGBHiAPZ4MkrPgKtX\")",

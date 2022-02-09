@@ -3,11 +3,11 @@ use crate::{ApiResult, BaseApi, HttpClient};
 const AUTHORIZATION_HEADER: &str = "Authorization";
 
 #[derive(Clone, Debug)]
-pub struct IdentityApi;
+pub struct Identity;
 
-impl BaseApi for IdentityApi {}
+impl BaseApi for Identity {}
 
-impl HttpClient<IdentityApi> {
+impl HttpClient<Identity> {
     pub async fn sign(
         &self,
         access_token: String,

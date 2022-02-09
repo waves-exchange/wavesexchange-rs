@@ -2,11 +2,11 @@ use crate::{ApiResult, BaseApi, HttpClient};
 use wavesexchange_warp::pagination::List;
 
 #[derive(Clone, Debug)]
-pub struct LiquidityPoolsApi;
+pub struct LiquidityPools;
 
-impl BaseApi for LiquidityPoolsApi {}
+impl BaseApi for LiquidityPools {}
 
-impl HttpClient<LiquidityPoolsApi> {
+impl HttpClient<LiquidityPools> {
     pub async fn stats(&self) -> ApiResult<List<dto::LiquidityPoolStats>> {
         self.create_req_handler(self.http_get("stats"), "liquidity_pools::stats")
             .execute()

@@ -2,11 +2,11 @@ use crate::{ApiResult, BaseApi, HttpClient};
 use chrono::{Duration, NaiveDate};
 
 #[derive(Clone, Debug)]
-pub struct RateAggregatesApi;
+pub struct RateAggregates;
 
-impl BaseApi for RateAggregatesApi {}
+impl BaseApi for RateAggregates {}
 
-impl HttpClient<RateAggregatesApi> {
+impl HttpClient<RateAggregates> {
     pub async fn get(
         &self,
         amount_asset_id: impl AsRef<str>,

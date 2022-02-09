@@ -1,4 +1,4 @@
-use super::{dto, DSList, DataSvcApi, Sort};
+use super::{dto, DSList, DataService, Sort};
 use crate::{ApiResult, HttpClient};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::de::DeserializeOwned;
@@ -8,7 +8,7 @@ use wavesexchange_warp::pagination::{List, PageInfo};
 const HEADER_ORIGIN_NAME: &str = "Origin";
 const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
 
-impl HttpClient<DataSvcApi> {
+impl HttpClient<DataService> {
     pub async fn rates<
         I: IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
         S1: AsRef<str>,

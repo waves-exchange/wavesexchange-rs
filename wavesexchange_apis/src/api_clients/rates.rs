@@ -2,11 +2,11 @@ use crate::{ApiResult, BaseApi, HttpClient};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
-pub struct RatesSvcApi;
+pub struct RatesService;
 
-impl BaseApi for RatesSvcApi {}
+impl BaseApi for RatesService {}
 
-impl HttpClient<RatesSvcApi> {
+impl HttpClient<RatesService> {
     pub async fn rates(
         &self,
         asset_pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,

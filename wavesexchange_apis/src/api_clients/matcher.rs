@@ -3,11 +3,11 @@ use bigdecimal::BigDecimal;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct MatcherApi;
+pub struct Matcher;
 
-impl BaseApi for MatcherApi {}
+impl BaseApi for Matcher {}
 
-impl HttpClient<MatcherApi> {
+impl HttpClient<Matcher> {
     pub async fn get(&self) -> ApiResult<HashMap<String, BigDecimal>> {
         self.create_req_handler(self.http_get(""), "matcher::get")
             .execute()
@@ -60,7 +60,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_assets_from_matcher() {
-        let client = HttpClient::<MatcherApi>::from_base_url(TESTNET::matcher_api_url);
+        let client = HttpClient::<Matcher>::from_base_url(TESTNET::matcher_api_url);
         let resp = client.get().await.unwrap();
         assert_eq!(resp["WAVES"], BigDecimal::from(1));
     }

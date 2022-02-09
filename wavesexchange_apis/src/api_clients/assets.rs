@@ -4,11 +4,11 @@ use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use wavesexchange_log::timer;
 
 #[derive(Clone, Debug)]
-pub struct AssetsSvcApi;
+pub struct AssetsService;
 
-impl BaseApi for AssetsSvcApi {}
+impl BaseApi for AssetsService {}
 
-impl HttpClient<AssetsSvcApi> {
+impl HttpClient<AssetsService> {
     pub async fn get(
         &self,
         asset_ids: impl IntoIterator<Item = impl Into<String>>,

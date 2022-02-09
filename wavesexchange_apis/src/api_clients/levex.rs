@@ -1,11 +1,11 @@
 use crate::{ApiResult, BaseApi, HttpClient};
 
 #[derive(Clone, Debug)]
-pub struct LevexApi;
+pub struct Levex;
 
-impl BaseApi for LevexApi {}
+impl BaseApi for Levex {}
 
-impl HttpClient<LevexApi> {
+impl HttpClient<Levex> {
     pub async fn leveraged_tokens_summary(&self) -> ApiResult<dto::SummaryResponse> {
         self.create_req_handler(self.http_get("summary"), "levex::leveraged_tokens_summary")
             .execute()
