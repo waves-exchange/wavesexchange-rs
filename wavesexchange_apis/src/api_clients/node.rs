@@ -106,6 +106,36 @@ impl HttpClient<Node> {
         .execute()
         .await
     }
+
+    pub async fn state_changes_by_address(
+        &self,
+        address: impl AsRef<str>,
+        limit: usize,
+        cursor: Option<String>,
+    ) -> ApiResult<Vec<dto::StateChangesResponse>> {
+        let url = format!(
+            "debug/stateChanges/address/{}/limit/{limit}{}",
+            address.as_ref(),
+            query_string = match &cursor {
+                None => String::from(""),
+                Some(id) => format!("?after={}", id),
+            }
+        );
+
+        self.create_req_handler(self.http_get(url), "node::state_changes_by_address")
+            .execute()
+            .await
+    }
+
+    pub async fn state_changes_by_transaction_id(
+        &self,
+        transaction_id: impl AsRef<str>,
+    ) -> ApiResult<Vec<dto::StateChangesResponse>> {
+        let url = format!("debug/stateChanges/info/{}", transaction_id.as_ref());
+        self.create_req_handler(self.http_get(url), "node::state_changes_by_transaction_id")
+            .execute()
+            .await
+    }
 }
 
 pub mod dto {
@@ -149,7 +179,7 @@ pub mod dto {
         pub keys: Vec<String>,
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Clone)]
     #[serde(tag = "type")]
     pub enum DataEntryResponse {
         #[serde(rename = "string")]
@@ -202,6 +232,51 @@ pub mod dto {
     pub enum AssetDetail {
         Ok(AssetDetailItem),
         Err(AssetDetailError),
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct StateChangesResponse {
+        #[serde(rename = "id")]
+        pub transaction_id: String,
+        pub height: i32,
+        pub timestamp: u64,
+        pub sender: String,
+        #[serde(rename = "type")]
+        pub transaction_type: u8,
+        #[serde(rename = "stateChanges")]
+        pub state_changes: Option<StateChangesResponseDataList>,
+        #[serde(rename = "dApp")]
+        pub dapp: Option<String>,
+        pub call: Option<StateChangesResponseCall>,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct StateChangesResponseCall {
+        pub function: String,
+        pub args: Vec<ArgumentResponse>,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct StateChangesResponseDataList {
+        pub data: Vec<DataEntryResponse>,
+        pub transfers: Vec<TransferResponse>,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    pub struct TransferResponse {
+        pub address: String,
+        pub asset: Option<String>,
+        pub amount: i64,
+    }
+
+    #[derive(Deserialize, Debug, Clone)]
+    #[serde(tag = "type")]
+    pub enum ArgumentResponse {
+        #[serde(rename = "integer")]
+        Integer { value: i64 },
+        #[serde(rename = "string")]
+        String { value: String },
+        // todo rest of them
     }
 }
 

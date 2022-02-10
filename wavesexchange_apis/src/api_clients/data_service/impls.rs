@@ -3,7 +3,7 @@ use crate::{ApiResult, HttpClient};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use wavesexchange_warp::pagination::{List, PageInfo};
+use wavesexchange_warp::pagination::List;
 
 const HEADER_ORIGIN_NAME: &str = "Origin";
 const HEADER_ORIGIN_VALUE: &str = "waves.exchange";
@@ -135,12 +135,6 @@ impl HttpClient<DataService> {
 
 impl<T: Serialize + DeserializeOwned> From<DSList<T>> for List<T> {
     fn from(dsl: DSList<T>) -> Self {
-        List {
-            page_info: PageInfo {
-                has_next_page: !dsl.is_last_page,
-                last_cursor: dsl.last_cursor,
-            },
-            items: dsl.data,
-        }
+        List::new(dsl.data, !dsl.is_last_page, dsl.last_cursor)
     }
 }

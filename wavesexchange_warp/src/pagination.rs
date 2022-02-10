@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PageInfo {
     pub has_next_page: bool,
@@ -10,6 +11,26 @@ pub struct PageInfo {
 pub struct List<T: Serialize> {
     pub page_info: PageInfo,
     pub items: Vec<T>,
+}
+
+impl<T: Serialize> List<T> {
+    pub fn new(
+        items: impl IntoIterator<Item = T>,
+        has_next_page: bool,
+        last_cursor: Option<String>,
+    ) -> Self {
+        List {
+            page_info: PageInfo {
+                has_next_page,
+                last_cursor,
+            },
+            items: items.into_iter().collect(),
+        }
+    }
+
+    pub fn from_one_page(items: impl IntoIterator<Item = T>) -> Self {
+        Self::new(items, false, None)
+    }
 }
 
 #[cfg(test)]
@@ -47,7 +68,10 @@ mod tests {
 
         assert_eq!(deserialized.items.first().unwrap().foo, 0);
         assert_eq!(deserialized.page_info.has_next_page, false);
-        assert_eq!(deserialized.page_info.last_cursor, Some("last_foo".to_owned()));
+        assert_eq!(
+            deserialized.page_info.last_cursor,
+            Some("last_foo".to_owned())
+        );
     }
 
     #[test]

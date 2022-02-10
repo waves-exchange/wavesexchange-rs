@@ -2,6 +2,7 @@ use crate::{ApiResult, BaseApi, HttpClient};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::StatusCode;
 use serde_json::json;
+use wavesexchange_warp::pagination::List;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -54,30 +55,45 @@ impl HttpClient<StateService> {
     pub async fn search(
         &self,
         query: impl Into<serde_json::Value>,
-        sort: Option<impl Into<serde_json::Value>>,
-        limit: Option<usize>,
-        offset: Option<usize>,
-    ) -> ApiResult<dto::StateSearchResult> {
-        let sort = sort.map(Into::into).unwrap_or_else(|| json!([]));
-        let limit = limit.unwrap_or(1000);
-        let offset = offset.unwrap_or(0);
+        sort: impl Into<serde_json::Value>,
+    ) -> ApiResult<Vec<dto::DataEntry>> {
+        let mut entries = vec![];
+        let limit = 1000;
 
         let mut qv: serde_json::Value = query.into();
-        qv["sort"] = sort;
+        qv["sort"] = sort.into();
         qv["limit"] = json!(limit);
-        qv["offset"] = json!(offset);
+        qv["offset"] = json!(0);
 
-        self.create_req_handler(self.http_post("search").json(&qv), "state::search")
-            .execute()
-            .await
+        loop {
+            let res: List<dto::DataEntry> = self
+                .create_req_handler::<dto::StateSearchResult, _>(
+                    self.http_post("search").json(&qv),
+                    "state::search",
+                )
+                .execute()
+                .await
+                .map(List::from)?;
+
+            qv.get_mut("offset")
+                .map(|v| *v = (v.as_u64().unwrap() + limit).into());
+
+            entries.extend(res.items);
+
+            if !res.page_info.has_next_page {
+                break;
+            }
+        }
+
+        Ok(entries)
     }
 }
 
 pub mod dto {
     use crate::models::DataEntryValue;
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataEntry {
         pub key: String,
         pub value: DataEntryValue,
@@ -88,6 +104,12 @@ pub mod dto {
     pub struct StateSearchResult {
         pub entries: Vec<DataEntry>,
         pub has_next_page: bool,
+    }
+}
+
+impl From<dto::StateSearchResult> for List<dto::DataEntry> {
+    fn from(ssr: dto::StateSearchResult) -> Self {
+        List::new(ssr.entries, ssr.has_next_page, None)
     }
 }
 
@@ -151,10 +173,7 @@ mod tests_internal {
             }
         });
 
-        let entries = mainnet_client()
-            .search(query, None, None, None)
-            .await
-            .unwrap();
+        let entries = mainnet_client().search(query, json!([])).await.unwrap();
 
         assert_eq!(entries.len(), 1);
     }
@@ -189,7 +208,7 @@ mod tests_internal {
             }
         });
 
-        let entries = mainnet_client().search(query, None, None).await.unwrap();
+        let entries = mainnet_client().search(query, json!([])).await.unwrap();
 
         assert!(entries.len() >= 9);
     }
