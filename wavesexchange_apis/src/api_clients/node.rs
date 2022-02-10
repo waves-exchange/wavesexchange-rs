@@ -130,7 +130,7 @@ impl HttpClient<Node> {
     pub async fn state_changes_by_transaction_id(
         &self,
         transaction_id: impl AsRef<str>,
-    ) -> ApiResult<Vec<dto::StateChangesResponse>> {
+    ) -> ApiResult<dto::StateChangesResponse> {
         let url = format!("debug/stateChanges/info/{}", transaction_id.as_ref());
         self.create_req_handler(self.http_get(url), "node::state_changes_by_transaction_id")
             .execute()
@@ -186,6 +186,10 @@ pub mod dto {
         String { key: String, value: String },
         #[serde(rename = "integer")]
         Integer { key: String, value: i64 },
+        #[serde(rename = "boolean")]
+        Boolean { key: String, value: bool },
+        #[serde(rename = "binary")]
+        Binary { key: String, value: Vec<u8> },
     }
 
     #[derive(Debug, Deserialize)]
