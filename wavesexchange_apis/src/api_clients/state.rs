@@ -21,10 +21,10 @@ impl HttpClient<StateService> {
         &self,
         address: impl AsRef<str>,
         key: impl AsRef<str>,
-        history_peg: Option<HistoryQuery>,
+        history_query: Option<HistoryQuery>,
     ) -> ApiResult<Option<dto::DataEntry>> {
         let key_encoded = utf8_percent_encode(key.as_ref(), NON_ALPHANUMERIC);
-        let url = match history_peg {
+        let url = match history_query {
             None => {
                 format!("entries/{}/{}", address.as_ref(), key_encoded,)
             }
@@ -57,9 +57,8 @@ impl HttpClient<StateService> {
         query: impl Into<serde_json::Value>,
         limit: Option<u64>,
         offset: Option<u64>,
-    ) -> ApiResult<Vec<dto::DataEntry>> {
+    ) -> ApiResult<List<dto::DataEntry>> {
         let mut entries = vec![];
-        let exhaust_paginator = limit.is_none();
         let limit = limit.unwrap_or(2000);
         let offset = offset.unwrap_or(0);
 
@@ -67,7 +66,7 @@ impl HttpClient<StateService> {
         qv["limit"] = json!(limit);
         qv["offset"] = json!(offset);
 
-        loop {
+        let mut list = loop {
             let res: List<dto::DataEntry> = self
                 .create_req_handler::<dto::StateSearchResult, _>(
                     self.http_post("search").json(&qv),
@@ -82,12 +81,16 @@ impl HttpClient<StateService> {
 
             entries.extend(res.items);
 
-            if !res.page_info.has_next_page || !exhaust_paginator {
-                break;
+            if !res.page_info.has_next_page {
+                break List {
+                    page_info: res.page_info,
+                    items: vec![],
+                };
             }
-        }
+        };
 
-        Ok(entries)
+        list.items = entries;
+        Ok(list)
     }
 }
 
