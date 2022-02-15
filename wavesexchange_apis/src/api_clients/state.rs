@@ -6,7 +6,7 @@ use wavesexchange_warp::pagination::List;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
-pub enum HistoryPeg {
+pub enum HistoryQuery {
     Height(u32),
     Timestamp(String),
 }
@@ -21,14 +21,14 @@ impl HttpClient<StateService> {
         &self,
         address: impl AsRef<str>,
         key: impl AsRef<str>,
-        history_peg: Option<HistoryPeg>,
+        history_peg: Option<HistoryQuery>,
     ) -> ApiResult<Option<dto::DataEntry>> {
         let key_encoded = utf8_percent_encode(key.as_ref(), NON_ALPHANUMERIC);
         let url = match history_peg {
             None => {
                 format!("entries/{}/{}", address.as_ref(), key_encoded,)
             }
-            Some(HistoryPeg::Height(height)) => {
+            Some(HistoryQuery::Height(height)) => {
                 format!(
                     "entries/{}/{}?height={}",
                     address.as_ref(),
@@ -36,7 +36,7 @@ impl HttpClient<StateService> {
                     height,
                 )
             }
-            Some(HistoryPeg::Timestamp(timestamp)) => {
+            Some(HistoryQuery::Timestamp(timestamp)) => {
                 format!(
                     "entries/{}/{}?block_timestamp={}",
                     address.as_ref(),
@@ -55,15 +55,17 @@ impl HttpClient<StateService> {
     pub async fn search(
         &self,
         query: impl Into<serde_json::Value>,
-        sort: impl Into<serde_json::Value>,
+        limit: Option<u64>,
+        offset: Option<u64>,
     ) -> ApiResult<Vec<dto::DataEntry>> {
         let mut entries = vec![];
-        let limit = 1000;
+        let exhaust_paginator = limit.is_none();
+        let limit = limit.unwrap_or(2000);
+        let offset = offset.unwrap_or(0);
 
         let mut qv: serde_json::Value = query.into();
-        qv["sort"] = sort.into();
         qv["limit"] = json!(limit);
-        qv["offset"] = json!(0);
+        qv["offset"] = json!(offset);
 
         loop {
             let res: List<dto::DataEntry> = self
@@ -80,7 +82,7 @@ impl HttpClient<StateService> {
 
             entries.extend(res.items);
 
-            if !res.page_info.has_next_page {
+            if !res.page_info.has_next_page || !exhaust_paginator {
                 break;
             }
         }
@@ -173,7 +175,7 @@ mod tests_internal {
             }
         });
 
-        let entries = mainnet_client().search(query, json!([])).await.unwrap();
+        let entries = mainnet_client().search(query, None, None).await.unwrap();
 
         assert_eq!(entries.len(), 1);
     }
@@ -208,7 +210,7 @@ mod tests_internal {
             }
         });
 
-        let entries = mainnet_client().search(query, json!([])).await.unwrap();
+        let entries = mainnet_client().search(query, None, None).await.unwrap();
 
         assert!(entries.len() >= 9);
     }

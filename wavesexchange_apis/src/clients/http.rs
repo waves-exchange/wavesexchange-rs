@@ -1,4 +1,4 @@
-use crate::{error, ApiResult, BaseApi, Error};
+use crate::{error, ApiResult, BaseApi};
 use futures::{future::BoxFuture, Future};
 use reqwest::{Client, ClientBuilder, Error as ReqError, RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
@@ -209,10 +209,9 @@ where
                 let response = resp
                     .text()
                     .await
-                    .map_err(|err| Error::ResponseParseError(err.to_string()))?;
-                serde_json::from_str(&response).map_err(|err| {
-                    error::json_error(err.to_string().as_ref(), req_info.clone(), &response)
-                })
+                    .map_err(|err| error::request_failed(err, &req_info))?;
+                serde_json::from_str(&response)
+                    .map_err(|err| error::json_error(err.to_string(), req_info, &response))
             },
         );
 

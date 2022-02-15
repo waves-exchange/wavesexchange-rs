@@ -37,9 +37,15 @@ pub fn request_failed(err: ReqError, req_info: impl Into<String>) -> Error {
     Error::HttpRequestError(Arc::new(err), format!("Request \"{req_info}\" failed"))
 }
 
-pub fn json_error(err: &str, req_info: impl Into<String>, resp_body: &str) -> Error {
+pub fn json_error(
+    err: impl Into<String>,
+    req_info: impl Into<String>,
+    resp_body: impl AsRef<str>,
+) -> Error {
     let req_info = req_info.into();
+    let err = err.into();
+    let body = resp_body.as_ref();
     Error::ResponseParseError(format!(
-        r#"Failed to parse json on request "{req_info}": {err}; body: "{resp_body}""#
+        r#"Failed to parse json on request "{req_info}": {err}; body: "{body}""#
     ))
 }
