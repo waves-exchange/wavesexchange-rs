@@ -62,7 +62,6 @@ pub mod dto {
 #[cfg(test)]
 mod tests {
     use super::dto::*;
-    use super::{Pairs, Price};
 
     #[test]
     fn leveraged_tokens_summary_response_parse() {
@@ -198,49 +197,5 @@ mod tests {
         assert_eq!(r.config.min_issue, 10000000);
         assert_eq!(r.config.min_pool, 10000000);
         assert_eq!(r.config.min_redeem, 10000000);
-
-        let first_pair_id = r.pairs[0].pair_id.clone();
-
-        let pairs: Pairs = r.try_into().unwrap();
-
-        assert_eq!(pairs.0.len(), 2);
-        let first_pair = pairs.0.get(&first_pair_id).unwrap();
-
-        assert_eq!(first_pair.pair_id, "3P3b9ZcfQmAyE9MVoRKE5tfRJSHR4BDXMEo");
-        assert_eq!(
-            first_pair.bear_id,
-            "45WTLz6e3Ek8Ffe7QHMkQ2TwfozfWsrodTHMtPyTMNtt"
-        );
-        assert_eq!(
-            first_pair.bull_id,
-            "HiiB3SSS1c89J5qQ6RLTUx4qgszLMQS2WRC3wfGfaCF8"
-        );
-        assert_eq!(
-            first_pair.pool_id,
-            "Ereo35igXbBwcwe9mxxjEUFgMk7FGQUioSUELMwZWYT8"
-        );
-        assert_eq!(first_pair.leverage_factor, 3);
-        assert_eq!(first_pair.max_issue_bull, 12835022);
-        assert_eq!(first_pair.max_issue_bear, 212798970915);
-        assert_eq!(
-            first_pair.current_price.bear,
-            Price::new(47786294211, 179825313521868527)
-        );
-        assert_eq!(
-            first_pair.current_price.bull,
-            Price::new(186103583782, 439684589734)
-        );
-        assert_eq!(first_pair.current_price.price_index, 92675);
-        assert_eq!(first_pair.current_price.timestamp, 1630642643964);
-        assert_eq!(
-            first_pair.previous_price.bear,
-            Price::new(53465296877, 170678993628027315)
-        );
-        assert_eq!(
-            first_pair.previous_price.bull,
-            Price::new(182583051642, 444784589734)
-        );
-        assert_eq!(first_pair.previous_price.price_index, 91272);
-        assert_eq!(first_pair.previous_price.timestamp, 1630556235570);
     }
 }

@@ -207,11 +207,12 @@ mod tests_internal {
                 None,
             )
             .await
-            .unwrap();
+            .unwrap()
+            .data;
 
         assert_eq!(rates.len(), 2);
-        assert!(rates[0].unwrap() > 0.0);
-        assert!(rates[1].is_none());
+        assert!(rates[0].data.rate > 0.0);
+        assert!(rates[1].data.rate == 0.0);
     }
 
     #[tokio::test]
@@ -228,11 +229,12 @@ mod tests_internal {
                 3,
             )
             .await
-            .unwrap();
+            .unwrap()
+            .items;
 
-        assert_eq!(invokes.data.len(), 3);
+        assert_eq!(invokes.len(), 3);
 
-        let tx = invokes.data[0].clone();
+        let tx = &invokes[0].data;
         assert_eq!(tx.id, "2i6b9EksSrVS4dpX7LNxDisuR4JAgoNaCQSmXK1Gjwia");
         assert_eq!(tx.height, 2645143);
         assert_eq!(tx.proofs, ["4Msv4pGbR8wnmdHtzoWe6cr6eMRnmzBfNANX7jEpVDxKme8cQqtNzu9CYc4JUvhh52DmPpiuWCpe1DHN2ZGCruoG"]);
@@ -246,8 +248,10 @@ mod tests_internal {
 
         // args with updated prices
         match &tx.call.args[1] {
-            InvokeScriptArgument::Binary(_) => panic!(),
-            InvokeScriptArgument::String(updated_prices) => assert_eq!(
+            InvokeScriptArgumentResponse::Binary { .. } => panic!(),
+            InvokeScriptArgumentResponse::String {
+                value: updated_prices,
+            } => assert_eq!(
                 updated_prices,
                 "BRL_5034198_1_UAH_27269793_1_GBP_718250_1_TRY_8764295_1"
             ),

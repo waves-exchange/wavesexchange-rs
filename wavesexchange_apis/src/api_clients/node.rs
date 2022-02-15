@@ -299,6 +299,7 @@ mod tests_internal {
     use super::dto::*;
     use super::tests::*;
     use super::*;
+    use crate::models::dto::DataEntry;
     use crate::tests::blockchains::{MAINNET, TESTNET};
 
     #[tokio::test]
@@ -308,13 +309,16 @@ mod tests_internal {
             .map(|sym| format!("%s%s__price__{}", sym))
             .collect();
 
-        let data_entries = mainnet_client()
+        let mut data_entries = mainnet_client()
             .data_entries(MAINNET::defo_control_contract, keys)
             .await
             .unwrap();
 
         assert_eq!(data_entries.len(), 6);
-        assert_eq!(data_entries.first().unwrap().key, "%s%s__price__UAH");
+        assert_eq!(
+            data_entries.pop().map(DataEntry::from).unwrap().key,
+            "%s%s__price__UAH"
+        );
     }
 
     #[tokio::test]

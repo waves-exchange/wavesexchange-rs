@@ -66,7 +66,7 @@ impl HttpClient<StateService> {
         qv["limit"] = json!(limit);
         qv["offset"] = json!(offset);
 
-        let mut list = loop {
+        loop {
             let res: List<dto::DataEntry> = self
                 .create_req_handler::<dto::StateSearchResult, _>(
                     self.http_post("search").json(&qv),
@@ -82,28 +82,18 @@ impl HttpClient<StateService> {
             entries.extend(res.items);
 
             if !res.page_info.has_next_page {
-                break List {
+                return Ok(List {
                     page_info: res.page_info,
-                    items: vec![],
-                };
+                    items: entries,
+                });
             }
-        };
-
-        list.items = entries;
-        Ok(list)
+        }
     }
 }
 
 pub mod dto {
-    use crate::models::DataEntryValue;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct DataEntry {
-        pub key: String,
-        pub value: DataEntryValue,
-        pub address: String,
-    }
+    pub use crate::models::dto::{DataEntry, DataEntryValue};
+    use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
     pub struct StateSearchResult {
@@ -180,7 +170,7 @@ mod tests_internal {
 
         let entries = mainnet_client().search(query, None, None).await.unwrap();
 
-        assert_eq!(entries.len(), 1);
+        assert_eq!(entries.items.len(), 1);
     }
 
     #[tokio::test]
@@ -215,6 +205,6 @@ mod tests_internal {
 
         let entries = mainnet_client().search(query, None, None).await.unwrap();
 
-        assert!(entries.len() >= 9);
+        assert!(entries.items.len() >= 9);
     }
 }

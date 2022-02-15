@@ -201,9 +201,10 @@ where
         self
     }
 
-    fn set_default_handlers(mut self) -> Self {
+    fn set_default_handlers(self) -> Self {
         let req_info = self.req_info.clone().into();
-        self = self.handle_status_code(
+        let req_info_ = req_info.clone();
+        self.handle_status_code(
             StatusCodes::Concrete(StatusCode::OK),
             move |resp| async move {
                 let response = resp
@@ -211,13 +212,11 @@ where
                     .await
                     .map_err(|err| error::request_failed(err, &req_info))?;
                 serde_json::from_str(&response)
-                    .map_err(|err| error::json_error(err.to_string(), req_info, &response))
+                    .map_err(|err| error::json_error(err.to_string(), req_info, response))
             },
-        );
-
-        let req_info = self.req_info.clone().into();
-        self.handle_status_code(StatusCodes::Other, move |resp| async move {
-            Err(error::invalid_status(resp, req_info.clone()).await)
+        )
+        .handle_status_code(StatusCodes::Other, move |resp| async move {
+            Err(error::invalid_status(resp, req_info_).await)
         })
     }
 
