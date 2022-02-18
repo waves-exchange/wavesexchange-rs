@@ -316,7 +316,7 @@ mod tests_internal {
 
         assert_eq!(data_entries.len(), 6);
         assert_eq!(
-            data_entries.pop().map(DataEntry::from).unwrap().key,
+            DataEntry::from(data_entries.remove(0)).key,
             "%s%s__price__UAH"
         );
     }

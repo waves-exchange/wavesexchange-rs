@@ -17,14 +17,14 @@ impl HttpClient<Levex> {
 pub mod dto {
     use serde::Deserialize;
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SummaryResponse {
         pub pairs: Vec<Pair>,
         pub config: Config,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Pair {
         pub pair_id: String,
@@ -37,7 +37,7 @@ pub mod dto {
         pub price_change: [PricePair; 2],
     }
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct PricePair {
         pub bear: [String; 2],
@@ -46,7 +46,7 @@ pub mod dto {
         pub timestamp: u64,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Config {
         pub usdn_pacemaker_fee: u64,
@@ -59,9 +59,20 @@ pub mod dto {
     }
 }
 
+// public exports for tests
+pub mod tests {
+    use super::*;
+    use crate::tests::blockchains::MAINNET;
+
+    pub fn mainnet_client() -> HttpClient<Levex> {
+        HttpClient::from_base_url(MAINNET::levex_api_url)
+    }
+}
+
 #[cfg(test)]
-mod tests {
+mod tests_internal {
     use super::dto::*;
+    use super::tests::*;
 
     #[test]
     fn leveraged_tokens_summary_response_parse() {
@@ -197,5 +208,10 @@ mod tests {
         assert_eq!(r.config.min_issue, 10000000);
         assert_eq!(r.config.min_pool, 10000000);
         assert_eq!(r.config.min_redeem, 10000000);
+    }
+
+    #[tokio::test]
+    async fn test_levex_summary() {
+        assert!(mainnet_client().leveraged_tokens_summary().await.is_ok())
     }
 }

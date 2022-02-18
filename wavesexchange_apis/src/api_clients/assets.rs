@@ -1,7 +1,6 @@
 use crate::{ApiResult, BaseApi, HttpClient};
 use itertools::join;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use wavesexchange_log::timer;
 
 #[derive(Clone, Debug)]
 pub struct AssetsService;
@@ -19,8 +18,6 @@ impl HttpClient<AssetsService> {
             None => return Ok(dto::AssetResponse { data: vec![] }),
         };
 
-        timer!("AssetService query");
-
         self.create_req_handler(self.get_client().get(&url), "assets::get_assets")
             .execute()
             .await
@@ -30,17 +27,17 @@ impl HttpClient<AssetsService> {
 pub mod dto {
     use serde::Deserialize;
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     pub struct AssetResponse {
         pub data: Vec<AssetData>,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     pub struct AssetData {
         pub data: Asset,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     pub struct Asset {
         pub id: String,
         pub quantity: i64,
@@ -67,8 +64,19 @@ fn build_url(
     Some(url)
 }
 
+// public exports for tests
+pub mod tests {
+    use super::*;
+    use crate::tests::blockchains::MAINNET;
+
+    pub fn mainnet_client() -> HttpClient<AssetsService> {
+        HttpClient::from_base_url(MAINNET::assets_service_url)
+    }
+}
+
 #[cfg(test)]
-mod tests {
+mod tests_internal {
+    use super::tests::*;
     use super::*;
 
     #[test]
@@ -94,5 +102,13 @@ mod tests {
             build_url("http://assets", vec!["foo%"], None).unwrap(),
             "http://assets?ids=foo%25"
         );
+    }
+
+    #[tokio::test]
+    async fn test_assets_get() {
+        let resp = mainnet_client().get(vec!["WAVES"], Some(1)).await.unwrap();
+        let data = &resp.data[0].data;
+        assert_eq!(&data.id, "WAVES");
+        assert_eq!(data.quantity, 10000000000000000);
     }
 }

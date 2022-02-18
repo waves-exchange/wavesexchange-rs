@@ -20,8 +20,7 @@ pub mod blockchains {
         pub const lp_rest_contract: &'static str = "3P8MoPnsaurofk1VyhsdAFkeQ6ijpJYXCpW";
 
         // upstream
-        pub const data_service_url: &'static str =
-            "https://mainnet-dev.wvservices.exchange/api/v1/forward/data_service";
+        pub const data_service_url: &'static str = "https://api.wavesplatform.com/v0";
         pub const node_url: &'static str = "https://nodes.waves.exchange";
         pub const matcher_url: &'static str = "https://matcher.waves.exchange";
         pub const matcher_api_url: &'static str =
