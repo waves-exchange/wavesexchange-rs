@@ -1,13 +1,12 @@
+use anymap::{any::Any, Map};
 use cached::async_mutex::Mutex;
 use dataloader::cached::Cache as DlCache;
 use once_cell::sync::Lazy;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::sync::Arc;
-use typemap::{ShareCloneMap, TypeMap};
 
-static CACHES: Lazy<Mutex<ShareCloneMap>> = Lazy::new(|| Mutex::new(TypeMap::custom()));
+static CACHES: Lazy<Mutex<Map<dyn Any + Send + Sync>>> = Lazy::new(|| Mutex::new(Map::new()));
 
 pub trait SharedObj: Send + Sync + 'static {}
 pub trait CacheKey: Eq + Hash + Clone + Debug + SharedObj {}
@@ -20,12 +19,6 @@ impl<T> CacheKey for T where T: Eq + Hash + Clone + Debug + SharedObj {}
 impl<T> CacheVal for T where T: Clone + Debug + SharedObj {}
 impl<K: CacheKey, V: CacheVal, T> CacheBounds<K, V> for T where T: cached::Cached<K, V> + SharedObj {}
 impl<T> ErrBounds for T where T: Debug + Send {}
-
-struct TyMapKey<T>(PhantomData<T>);
-
-impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> typemap::Key for TyMapKey<(K, V, C)> {
-    type Value = Arc<Mutex<Cacher<K, V, C>>>;
-}
 
 pub struct Cacher<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> {
     cache: C,
@@ -72,7 +65,7 @@ impl<K: CacheKey, V: CacheVal, C: CacheBounds<K, V>> Cacher<K, V, C> {
     ) -> Arc<Mutex<Cacher<K, V, C>>> {
         let mut caches = CACHES.lock().await;
         let entry = caches
-            .entry::<TyMapKey<(K, V, C)>>()
+            .entry::<Arc<Mutex<Cacher<K, V, C>>>>()
             .or_insert(Arc::new(Mutex::new(Self::new(
                 inner_cache_fn(),
                 strategy_fn,

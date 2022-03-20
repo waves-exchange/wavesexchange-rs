@@ -6,7 +6,7 @@
 Usage example:
 ```rust
 mod define {
-    use wavesexchange_loaders::{CachedLoader, SizedCache}
+    use wavesexchange_loaders::{CachedLoader, SizedCache};
     use error::MyBeautifulError;
 
     struct SomeLoaderStruct;
@@ -31,10 +31,12 @@ mod usage {
     use super::define::SomeLoaderStruct;
     use wavesexchange_loaders::{Loader, LoaderError};
 
-    let s = SomeLoaderStruct {};
-    // result type is listed here just for clarity,
-    // the .load() argument type annotation is enough for compiler to infer other types
-    let result: Result<String, LoaderError<MyBeautifulError>> = s.load(5i32);
+    fn main() {
+        let s = SomeLoaderStruct {};
+        // result type is listed here just for clarity,
+        // the .load() argument type annotation is enough for compiler to infer other types
+        let result: Result<String, LoaderError<MyBeautifulError>> = s.load(5i32);
+    }
 }
 ```
 
