@@ -4,7 +4,10 @@ use chrono::{Duration, NaiveDate};
 #[derive(Clone, Debug)]
 pub struct RateAggregates;
 
-impl BaseApi for RateAggregates {}
+impl BaseApi for RateAggregates {
+    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/rate_aggregates";
+    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/rate_aggregates";
+}
 
 impl HttpClient<RateAggregates> {
     pub async fn get(

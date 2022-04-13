@@ -13,27 +13,18 @@ pub mod blockchains {
         pub const port: u16 = 8080;
 
         // addresses
-        pub const matcher: &'static str = "3PEjHv3JGjcWNpYEEkif2w8NXV4kbhnoGgu";
-        pub const defo_control_contract: &'static str = "3P8qJyxUqizCWWtEn2zsLZVPzZAjdNGppB1";
-        pub const defo_factory_contract: &'static str = "3PQEjFmdcjd6wf1TrpkHSuDAk3zbfLSeikb";
-        pub const lp_factory_contract: &'static str = "3P7YV1GYyfcAZMy6dmJdJv6zrDp7nZsNexT";
-        pub const lp_rest_contract: &'static str = "3P8MoPnsaurofk1VyhsdAFkeQ6ijpJYXCpW";
+        pub const matcher: &str = "3PEjHv3JGjcWNpYEEkif2w8NXV4kbhnoGgu";
+        pub const defo_control_contract: &str = "3P8qJyxUqizCWWtEn2zsLZVPzZAjdNGppB1";
+        pub const defo_factory_contract: &str = "3PQEjFmdcjd6wf1TrpkHSuDAk3zbfLSeikb";
+        pub const lp_factory_contract: &str = "3P7YV1GYyfcAZMy6dmJdJv6zrDp7nZsNexT";
+        pub const lp_rest_contract: &str = "3P8MoPnsaurofk1VyhsdAFkeQ6ijpJYXCpW";
 
         // upstream
-        pub const data_service_url: &'static str = "https://api.wavesplatform.com/v0";
-        pub const node_url: &'static str = "https://nodes.waves.exchange";
-        pub const matcher_url: &'static str = "https://matcher.waves.exchange";
-        pub const matcher_api_url: &'static str =
-            "https://matcher.waves.exchange/matcher/settings/rates";
-        pub const state_service_url: &'static str = "https://waves.exchange/api/v1/state";
-        pub const assets_service_url: &'static str = "https://waves.exchange/api/v1/assets";
-        pub const levex_api_url: &'static str = "https://api.levex.fi";
-        pub const blockchain_updates_url: &'static str =
-            "https://blockchain-updates.waves.exchange";
+        pub const matcher_url: &str = "https://matcher.waves.exchange";
 
         // assets
-        pub const usdn_asset_id: &'static str = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p";
-        pub const usd_like_assets: Lazy<Vec<&'static str>> = Lazy::new(|| {
+        pub const usdn_asset_id: &str = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p";
+        pub const usd_like_assets: Lazy<Vec<&str>> = Lazy::new(|| {
             vec![
                 "34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ",
                 "6XtHjpXbs9RRJP2Sr9GUyVqzACcby9TkThHXnjVC5CDJ",
@@ -69,7 +60,7 @@ pub mod blockchains {
 
         // ido
         pub const ido_finish_height: u32 = 1;
-        pub const wx_asset_id: &'static str = "8vY8eafCAX83CMGEXHskhA2FQiX5xUrn8ExuxLroLnsX";
+        pub const wx_asset_id: &str = "8vY8eafCAX83CMGEXHskhA2FQiX5xUrn8ExuxLroLnsX";
         pub const wx_usdn_rate: f32 = 1.0;
     }
 
@@ -78,31 +69,22 @@ pub mod blockchains {
         pub const port: u16 = 8080;
 
         // addresses
-        pub const matcher: &'static str = "3N8aZG6ZDfnh8YxS6aNcteobN8eXTWHaBBd";
-        pub const defo_control_contract: &'static str = "3MyAeWKH4gAS6iDvTRo42Rz3WCoMEi63WMC";
-        pub const defo_factory_contract: &'static str = "3N3UHNYQ8xwe2WWLKgXX628JyUtF6kYK4wS";
-        pub const lp_factory_contract: &'static str = "3MxueHaGvWmdk5crtn9HwtkSAAZScTWoHaC";
-        pub const lp_rest_contract: &'static str = "3MsNhK6uve98J6DeqbuwGFBRh9GoHPGUFgp";
+        pub const matcher: &str = "3N8aZG6ZDfnh8YxS6aNcteobN8eXTWHaBBd";
+        pub const defo_control_contract: &str = "3MyAeWKH4gAS6iDvTRo42Rz3WCoMEi63WMC";
+        pub const defo_factory_contract: &str = "3N3UHNYQ8xwe2WWLKgXX628JyUtF6kYK4wS";
+        pub const lp_factory_contract: &str = "3MxueHaGvWmdk5crtn9HwtkSAAZScTWoHaC";
+        pub const lp_rest_contract: &str = "3MsNhK6uve98J6DeqbuwGFBRh9GoHPGUFgp";
 
         // upstream
-        pub const data_service_url: &'static str = "https://api-testnet.wavesplatform.com";
-        pub const node_url: &'static str = "https://nodes-testnet.wavesnodes.com";
-        pub const matcher_url: &'static str = "https://matcher-testnet.waves.exchange";
-        pub const matcher_api_url: &'static str =
-            "https://matcher-testnet.waves.exchange/matcher/settings/rates";
-        pub const state_service_url: &'static str = "https://testnet.waves.exchange/api/v1/state";
-        pub const assets_service_url: &'static str = "https://testnet.waves.exchange/api/v1/assets";
-        pub const levex_api_url: &'static str = "https://api.levex.fi";
-        pub const blockchain_updates_url: &'static str =
-            "https://blockchain-updates-testnet.waves.exchange";
+        pub const matcher_url: &str = "https://matcher-testnet.waves.exchange";
 
         // assets
-        pub const usdn_asset_id: &'static str = "25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT";
+        pub const usdn_asset_id: &str = "25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT";
         // todo insert testnet USD* assets
-        pub const usd_like_assets: Vec<&'static str> = vec![];
+        pub const usd_like_assets: Vec<&str> = vec![];
 
         // any_stake
-        pub const products: Lazy<Vec<Product>> = Lazy::new(|| {
+        pub static products: Lazy<Vec<Product>> = Lazy::new(|| {
             vec![
                 Product {
                     id: "any_stake".to_owned(),
@@ -125,7 +107,7 @@ pub mod blockchains {
 
         // ido
         pub const ido_finish_height: u32 = 1;
-        pub const wx_asset_id: &'static str = "5muRM8MHa6QMq1YEFmkAnudLD89qpvrUwDFyiyTZgu9p";
+        pub const wx_asset_id: &str = "5muRM8MHa6QMq1YEFmkAnudLD89qpvrUwDFyiyTZgu9p";
         pub const wx_usdn_rate: f32 = 1.0;
     }
 }

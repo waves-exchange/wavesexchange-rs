@@ -3,7 +3,10 @@ use crate::{ApiResult, BaseApi, HttpClient};
 #[derive(Clone, Debug)]
 pub struct AssetsService;
 
-impl BaseApi for AssetsService {}
+impl BaseApi for AssetsService {
+    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/assets";
+    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/assets";
+}
 
 impl HttpClient<AssetsService> {
     pub async fn get(
@@ -142,39 +145,5 @@ pub mod dto {
         pub height__gte: Option<u32>,
         pub format: OutputFormat,
         pub include_metadata: bool,
-    }
-}
-
-// public exports for tests
-pub mod tests {
-    use super::*;
-    use crate::tests::blockchains::MAINNET;
-
-    pub fn mainnet_client() -> HttpClient<AssetsService> {
-        HttpClient::from_base_url(MAINNET::assets_service_url)
-    }
-}
-
-#[cfg(test)]
-mod tests_internal {
-    use super::tests::*;
-    use super::*;
-
-    #[tokio::test]
-    async fn test_assets_get() {
-        let resp = mainnet_client()
-            .get(vec!["WAVES"], Some(1), dto::OutputFormat::Full, true)
-            .await
-            .unwrap();
-        let resp = &resp.data[0];
-        let data = if let dto::AssetInfo::Full(r) = resp.data.as_ref().unwrap() {
-            r
-        } else {
-            panic!("Wrong output format");
-        };
-        assert_eq!(&data.id, "WAVES");
-        assert_eq!(data.quantity, 10000000000000000);
-        let label = &resp.metadata.as_ref().expect("no metadata found").labels[0];
-        assert!(matches!(label, dto::AssetLabel::Gateway));
     }
 }

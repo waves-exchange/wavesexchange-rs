@@ -3,7 +3,10 @@ use crate::{ApiResult, BaseApi, HttpClient};
 #[derive(Clone, Debug)]
 pub struct InterestService;
 
-impl BaseApi for InterestService {}
+impl BaseApi for InterestService {
+    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/interest_rates";
+    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/interest_rates";
+}
 
 impl HttpClient<InterestService> {
     pub async fn get(&self, asset_id: impl AsRef<str>) -> ApiResult<dto::InterestRatesResponse> {

@@ -1,10 +1,13 @@
 pub mod grpc;
 pub mod http;
 
-/*
 use crate::BaseApi;
-pub trait ApiClient {}
+use http::HttpClient;
 
-impl<A: BaseApi<Self>> ApiClient for http::HttpClient<A> {}
-impl<A: BaseApi<Self>> ApiClient for grpc::GrpcClient<A> {}
-*/
+pub fn mainnet_client<A: BaseApi>() -> HttpClient<A> {
+    HttpClient::from_base_url(A::MAINNET_URL)
+}
+
+pub fn testnet_client<A: BaseApi>() -> HttpClient<A> {
+    HttpClient::from_base_url(A::TESTNET_URL)
+}

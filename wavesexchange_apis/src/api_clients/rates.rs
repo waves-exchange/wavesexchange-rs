@@ -4,7 +4,10 @@ use std::fmt::Debug;
 #[derive(Clone, Debug)]
 pub struct RatesService;
 
-impl BaseApi for RatesService {}
+impl BaseApi for RatesService {
+    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/rates";
+    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/rates";
+}
 
 impl HttpClient<RatesService> {
     pub async fn rates(

@@ -5,7 +5,11 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct Matcher;
 
-impl BaseApi for Matcher {}
+impl BaseApi for Matcher {
+    const MAINNET_URL: &'static str = "https://matcher.waves.exchange/matcher/settings/rates";
+    const TESTNET_URL: &'static str =
+        "https://matcher-testnet.waves.exchange/matcher/settings/rates";
+}
 
 impl HttpClient<Matcher> {
     pub async fn get(&self) -> ApiResult<HashMap<String, BigDecimal>> {
@@ -50,18 +54,5 @@ pub mod dto {
         pub success: bool,
         pub status: OrderStatus,
         pub message: serde_json::Value,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tests::blockchains::TESTNET;
-
-    #[tokio::test]
-    async fn test_assets_from_matcher() {
-        let client = HttpClient::<Matcher>::from_base_url(TESTNET::matcher_api_url);
-        let resp = client.get().await.unwrap();
-        assert_eq!(resp["WAVES"], BigDecimal::from(1));
     }
 }

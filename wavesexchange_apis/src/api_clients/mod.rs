@@ -28,4 +28,7 @@ pub use transfers::Transfers;
 
 use std::fmt::Debug;
 
-pub trait BaseApi: Sync + Clone + Debug {}
+pub trait BaseApi: Sync + Clone + Debug {
+    const MAINNET_URL: &'static str;
+    const TESTNET_URL: &'static str;
+}

@@ -6,7 +6,10 @@ use serde_json::json;
 #[derive(Clone, Debug)]
 pub struct Node;
 
-impl BaseApi for Node {}
+impl BaseApi for Node {
+    const MAINNET_URL: &'static str = "https://nodes.waves.exchange";
+    const TESTNET_URL: &'static str = "https://nodes-testnet.wavesnodes.com";
+}
 
 impl HttpClient<Node> {
     pub async fn data_entries(
@@ -281,84 +284,5 @@ pub mod dto {
         #[serde(rename = "string")]
         String { value: String },
         // todo rest of them
-    }
-}
-
-// public exports for tests
-pub mod tests {
-    use super::*;
-    use crate::tests::blockchains::MAINNET;
-
-    pub fn mainnet_client() -> HttpClient<Node> {
-        HttpClient::from_base_url(MAINNET::node_url)
-    }
-}
-
-#[cfg(test)]
-mod tests_internal {
-    use super::dto::*;
-    use super::tests::*;
-    use super::*;
-    use crate::models::dto::DataEntry;
-    use crate::tests::blockchains::{MAINNET, TESTNET};
-
-    #[tokio::test]
-    async fn data_entries() {
-        let keys: Vec<String> = ["UAH", "EUR", "CNY", "JPY", "RUB", "NGN"]
-            .iter()
-            .map(|sym| format!("%s%s__price__{}", sym))
-            .collect();
-
-        let mut data_entries = mainnet_client()
-            .data_entries(MAINNET::defo_control_contract, keys)
-            .await
-            .unwrap();
-
-        assert_eq!(data_entries.len(), 6);
-        assert_eq!(
-            DataEntry::from(data_entries.remove(0)).key,
-            "%s%s__price__UAH"
-        );
-    }
-
-    #[tokio::test]
-    async fn evaluate() {
-        let result = HttpClient::<Node>::from_base_url(TESTNET::node_url)
-            .evaluate(
-                &TESTNET::products[0].contract_address,
-                "privateCurrentSysParamsREST(\"5Sh9KghfkZyhjwuodovDhB6PghDUGBHiAPZ4MkrPgKtX\")",
-            )
-            .await
-            .unwrap();
-
-        match result.result {
-            Value::Tuple { value } => {
-                let price = match value.get("_1") {
-                    Some(Value::IntegerEntry {
-                        value:
-                            IntegerEntryValue {
-                                value: IntValue { value },
-                                ..
-                            },
-                    }) => value.to_owned(),
-                    _ => panic!(),
-                };
-
-                let decimals_mult = match value.get("_2") {
-                    Some(Value::IntegerEntry {
-                        value:
-                            IntegerEntryValue {
-                                value: IntValue { value },
-                                ..
-                            },
-                    }) => value.to_owned(),
-                    _ => panic!(),
-                };
-
-                assert!(price > 0);
-                assert!(decimals_mult > 0);
-            }
-            _ => panic!(),
-        };
     }
 }

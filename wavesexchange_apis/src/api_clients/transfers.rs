@@ -5,7 +5,10 @@ use wavesexchange_warp::pagination::List;
 #[derive(Clone, Debug)]
 pub struct Transfers;
 
-impl BaseApi for Transfers {}
+impl BaseApi for Transfers {
+    const MAINNET_URL: &'static str = todo!();
+    const TESTNET_URL: &'static str = todo!();
+}
 
 impl HttpClient<Transfers> {
     #[async_recursion]

@@ -4,7 +4,10 @@ use wavesexchange_warp::pagination::List;
 #[derive(Clone, Debug)]
 pub struct LiquidityPools;
 
-impl BaseApi for LiquidityPools {}
+impl BaseApi for LiquidityPools {
+    const MAINNET_URL: &'static str = todo!();
+    const TESTNET_URL: &'static str = todo!();
+}
 
 impl HttpClient<LiquidityPools> {
     pub async fn stats(&self) -> ApiResult<List<dto::LiquidityPoolStats>> {

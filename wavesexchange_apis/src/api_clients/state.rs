@@ -14,7 +14,10 @@ pub enum HistoryQuery {
 #[derive(Clone, Debug)]
 pub struct StateService;
 
-impl BaseApi for StateService {}
+impl BaseApi for StateService {
+    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/state";
+    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/state";
+}
 
 impl HttpClient<StateService> {
     pub async fn entries(
@@ -105,106 +108,5 @@ pub mod dto {
 impl From<dto::StateSearchResult> for List<dto::DataEntry> {
     fn from(ssr: dto::StateSearchResult) -> Self {
         List::new(ssr.entries, ssr.has_next_page, None)
-    }
-}
-
-// public exports for tests
-pub mod tests {
-    use super::*;
-    use crate::tests::blockchains::MAINNET;
-    use crate::tests::blockchains::TESTNET;
-
-    pub fn mainnet_client() -> HttpClient<StateService> {
-        HttpClient::from_base_url(MAINNET::state_service_url)
-    }
-
-    pub fn testnet_client() -> HttpClient<StateService> {
-        HttpClient::from_base_url(TESTNET::state_service_url)
-    }
-}
-
-#[cfg(test)]
-mod tests_internal {
-    use super::tests::*;
-    use serde_json::json;
-
-    #[tokio::test]
-    async fn test_get_state() {
-        let entries = testnet_client()
-            .entries(
-                "3MrbnZkriTBZhRqS45L1VfCrden6Erpa7To",
-                "%s__priceDecimals",
-                None,
-            )
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(entries.key, "%s__priceDecimals");
-
-        let entries_none = testnet_client()
-            .entries("3MrbnZkriTBZhRqS45L1VfCrden6Erpa7To", "%s__priceDeci", None)
-            .await
-            .unwrap();
-        assert!(entries_none.is_none());
-    }
-
-    #[tokio::test]
-    async fn single_asset_price_request() {
-        let query = json!({
-            "filter": {
-                "in": {
-                    "properties": [
-                        {
-                            "address": {}
-                        },
-                        {
-                            "key": {}
-                        }
-                    ],
-                    "values": [
-                        ["3P8qJyxUqizCWWtEn2zsLZVPzZAjdNGppB1", "%s%s__price__UAH"]
-                    ]
-                }
-            }
-        });
-
-        let entries = mainnet_client().search(query, None, None).await.unwrap();
-
-        assert_eq!(entries.items.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn defo_assets_list() {
-        let query = json!({
-            "filter": {
-                "and": [
-                  {
-                    "address": {
-                      "value": "3PQEjFmdcjd6wf1TrpkHSuDAk3zbfLSeikb"
-                    }
-                  },
-                  {
-                    "fragment": {
-                      "position": 0,
-                      "type": "string",
-                      "operation": "eq",
-                      "value": "defoAsset"
-                    }
-                  },
-                  {
-                    "fragment": {
-                      "position": 2,
-                      "type": "string",
-                      "operation": "eq",
-                      "value": "config"
-                    }
-                  }
-                ]
-            }
-        });
-
-        let entries = mainnet_client().search(query, None, None).await.unwrap();
-
-        assert!(entries.items.len() >= 9);
     }
 }
