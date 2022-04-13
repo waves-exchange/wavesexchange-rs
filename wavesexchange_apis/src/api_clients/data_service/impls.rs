@@ -1,4 +1,4 @@
-use super::{dto, DSList, DataService, Sort};
+use super::{dto, DSList, DataService, InvokeScriptTransactionRequest, Sort};
 use crate::{ApiResult, HttpClient};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::de::DeserializeOwned;
@@ -40,21 +40,36 @@ impl HttpClient<DataService> {
 
     pub async fn invoke_script_transactions(
         &self,
-        dapp: impl AsRef<str>,
-        function: impl AsRef<str>,
-        timestamp_lt: impl Into<NaiveDateTime>,
-        // timestamp_gte: NaiveDateTime,
-        sort: Sort,
+        senders: Option<impl IntoIterator<Item = impl Into<String>>>,
+        timestamp_start: Option<impl Into<NaiveDateTime>>,
+        timestamp_end: Option<impl Into<NaiveDateTime>>,
+        dapp: Option<impl Into<String>>,
+        function: Option<impl Into<String>>,
+        after: Option<impl Into<String>>,
+        sort: Option<Sort>,
         limit: usize,
     ) -> ApiResult<List<dto::InvokeScriptTransactionResponse>> {
-        let url = format!(
-            "transactions/invoke-script?dapp={}&function={}&timeEnd={:?}&sort={}&limit={}",
-            dapp.as_ref(),
-            function.as_ref(),
-            timestamp_lt.into(),
+        let senders = senders.map(|s| s.into_iter().map(Into::into).collect::<Vec<_>>());
+        let (sender, senders) = if match &senders {
+            Some(s) => s.len() == 1,
+            None => false,
+        } {
+            (senders.map(|mut s| s.pop().unwrap()), None)
+        } else {
+            (None, senders)
+        };
+        let url = serde_qs::to_string(&InvokeScriptTransactionRequest {
+            dapp: dapp.map(Into::into),
+            after: after.map(Into::into),
+            function: function.map(Into::into),
+            limit: if limit == 0 { None } else { Some(limit) },
+            sender,
+            senders,
             sort,
-            limit,
-        );
+            timeEnd: timestamp_end.map(Into::into),
+            timeStart: timestamp_start.map(Into::into),
+        })
+        .unwrap();
 
         self.create_req_handler::<DSList<dto::InvokeScriptTransactionResponse>, _>(
             self.http_get(&url)

@@ -58,6 +58,20 @@ pub mod dto {
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[allow(non_snake_case)]
+    pub struct InvokeScriptTransactionRequest {
+        pub sender: Option<String>,
+        pub senders: Option<Vec<String>>,
+        pub timeStart: Option<NaiveDateTime>,
+        pub timeEnd: Option<NaiveDateTime>,
+        pub dapp: Option<String>,
+        pub function: Option<String>,
+        pub after: Option<String>,
+        pub sort: Option<Sort>,
+        pub limit: Option<usize>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Order {
         // only trade-related data so far

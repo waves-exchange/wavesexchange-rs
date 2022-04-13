@@ -31,10 +31,13 @@ async fn fetch_invokes_control_contract_finalize_current_price_v2() {
 
     let invokes = mainnet_client::<DataService>()
         .invoke_script_transactions(
-            MAINNET::defo_control_contract,
-            "finalizeCurrentPriceV2",
-            timestamp_lt,
-            dto::Sort::Desc,
+            None,
+            None,
+            Some(timestamp_lt),
+            Some(MAINNET::defo_control_contract),
+            Some("finalizeCurrentPriceV2"),
+            None,
+            Some(dto::Sort::Desc),
             3,
         )
         .await
