@@ -59,7 +59,7 @@ impl HttpClient<StateService> {
         offset: Option<u64>,
     ) -> ApiResult<List<dto::DataEntry>> {
         let mut entries = vec![];
-        let limit = limit.unwrap_or(2000);
+        let limit = limit.unwrap_or(1000);
         let offset = offset.unwrap_or(0);
 
         let mut qv: serde_json::Value = query.into();
