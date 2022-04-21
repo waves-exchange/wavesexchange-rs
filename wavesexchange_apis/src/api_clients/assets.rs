@@ -1,6 +1,4 @@
 use crate::{ApiResult, BaseApi, HttpClient};
-use itertools::join;
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
 #[derive(Clone, Debug)]
 pub struct AssetsService;
