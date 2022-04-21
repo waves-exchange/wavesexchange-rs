@@ -33,7 +33,7 @@ pub mod blockchains {
         });
 
         // any_stake
-        pub const products: Lazy<Vec<Product>> = Lazy::new(|| {
+        pub static products: Lazy<Vec<Product>> = Lazy::new(|| {
             vec![Product {
                 id: "any_stake".to_owned(),
                 contract_address: "3P6SFR9ZZwKHZw5mMDZxpXHEhg1CXjBb51y".to_owned(),

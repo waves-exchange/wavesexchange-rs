@@ -41,8 +41,8 @@ impl HttpClient<DataService> {
     pub async fn invoke_script_transactions(
         &self,
         senders: Option<impl IntoIterator<Item = impl Into<String>>>,
-        timestamp_start: Option<impl Into<NaiveDateTime>>,
-        timestamp_end: Option<impl Into<NaiveDateTime>>,
+        timestamp_start: Option<NaiveDateTime>,
+        timestamp_end: Option<NaiveDateTime>,
         dapp: Option<impl Into<String>>,
         function: Option<impl Into<String>>,
         after: Option<impl Into<String>>,
