@@ -221,7 +221,7 @@ mod tests_internal {
         };
         assert_eq!(&data.id, "WAVES");
         assert_eq!(data.quantity, 10000000000000000);
-        let label = &resp.metadata.as_ref().unwrap().labels[0];
+        let label = &resp.metadata.as_ref().expect("no metadata found").labels[0];
         assert!(matches!(label, dto::AssetLabel::Gateway));
     }
 }
