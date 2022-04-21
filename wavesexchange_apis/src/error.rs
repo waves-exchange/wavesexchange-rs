@@ -49,7 +49,7 @@ pub fn json_error(
     let body = {
         let body = resp_body.into();
         if body.len() > MAX_BODY_LEN {
-            format!("{} <...>", body[..MAX_BODY_LEN].to_string())
+            format!("{} <...>", &body[..MAX_BODY_LEN])
         } else {
             body
         }

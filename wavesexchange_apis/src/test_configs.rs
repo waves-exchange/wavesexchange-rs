@@ -1,4 +1,4 @@
-#[allow(non_upper_case_globals, non_snake_case, dead_code)]
+#[allow(non_upper_case_globals, non_snake_case)]
 pub mod blockchains {
     use once_cell::sync::Lazy;
 
@@ -24,7 +24,7 @@ pub mod blockchains {
 
         // assets
         pub const usdn_asset_id: &str = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p";
-        pub const usd_like_assets: Lazy<Vec<&str>> = Lazy::new(|| {
+        pub static usd_like_assets: Lazy<Vec<&str>> = Lazy::new(|| {
             vec![
                 "34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ",
                 "6XtHjpXbs9RRJP2Sr9GUyVqzACcby9TkThHXnjVC5CDJ",
