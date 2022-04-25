@@ -72,7 +72,7 @@ impl HttpClient<DataService> {
         .unwrap();
 
         self.create_req_handler::<DSList<dto::InvokeScriptTransactionResponse>, _>(
-            self.http_get(&url)
+            self.http_get(format!("transactions/invoke-script?{url}"))
                 .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
             "data_service::invoke_script_transactions",
         )
