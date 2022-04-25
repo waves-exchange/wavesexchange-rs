@@ -3,10 +3,7 @@ use crate::{ApiResult, BaseApi, HttpClient};
 #[derive(Clone, Debug)]
 pub struct Levex;
 
-impl BaseApi for Levex {
-    const MAINNET_URL: &'static str = "https://api.levex.fi";
-    const TESTNET_URL: &'static str = Self::MAINNET_URL;
-}
+impl BaseApi for Levex {}
 
 impl HttpClient<Levex> {
     pub async fn leveraged_tokens_summary(&self) -> ApiResult<dto::SummaryResponse> {

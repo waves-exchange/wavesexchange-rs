@@ -6,10 +6,7 @@ use serde_json::json;
 #[derive(Clone, Debug)]
 pub struct Node;
 
-impl BaseApi for Node {
-    const MAINNET_URL: &'static str = "https://nodes.waves.exchange";
-    const TESTNET_URL: &'static str = "https://nodes-testnet.wavesnodes.com";
-}
+impl BaseApi for Node {}
 
 impl HttpClient<Node> {
     pub async fn data_entries(

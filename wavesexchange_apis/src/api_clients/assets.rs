@@ -3,10 +3,7 @@ use crate::{ApiResult, BaseApi, HttpClient};
 #[derive(Clone, Debug)]
 pub struct AssetsService;
 
-impl BaseApi for AssetsService {
-    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/assets";
-    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/assets";
-}
+impl BaseApi for AssetsService {}
 
 impl HttpClient<AssetsService> {
     pub async fn get(

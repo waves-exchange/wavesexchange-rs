@@ -15,10 +15,7 @@ use waves_protobuf_schemas::waves::events::{
 #[derive(Clone, Debug)]
 pub struct BlockchainUpdates;
 
-impl BaseApi for BlockchainUpdates {
-    const MAINNET_URL: &'static str = "https://blockchain-updates.waves.exchange";
-    const TESTNET_URL: &'static str = "https://blockchain-updates-testnet.waves.exchange";
-}
+impl BaseApi for BlockchainUpdates {}
 
 impl GrpcClient<BlockchainUpdates> {
     pub async fn fetch_transactions_at_height(

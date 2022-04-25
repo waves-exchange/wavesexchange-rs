@@ -1,8 +1,9 @@
-use wavesexchange_apis::{assets::dto, mainnet_client, AssetsService};
+use crate::common::MAINNET;
+use wavesexchange_apis::{assets::dto, AssetsService, HttpClient};
 
 #[tokio::test]
 async fn test_assets_get() {
-    let resp = mainnet_client::<AssetsService>()
+    let resp = HttpClient::<AssetsService>::from_base_url(MAINNET::assets_service_url)
         .get(vec!["WAVES"], Some(1), dto::OutputFormat::Full, true)
         .await
         .unwrap();

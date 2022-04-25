@@ -5,11 +5,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct Matcher;
 
-impl BaseApi for Matcher {
-    const MAINNET_URL: &'static str = "https://matcher.waves.exchange/matcher/settings/rates";
-    const TESTNET_URL: &'static str =
-        "https://matcher-testnet.waves.exchange/matcher/settings/rates";
-}
+impl BaseApi for Matcher {}
 
 impl HttpClient<Matcher> {
     pub async fn get(&self) -> ApiResult<HashMap<String, BigDecimal>> {

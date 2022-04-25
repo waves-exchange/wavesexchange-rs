@@ -5,10 +5,7 @@ const AUTHORIZATION_HEADER: &str = "Authorization";
 #[derive(Clone, Debug)]
 pub struct Identity;
 
-impl BaseApi for Identity {
-    const MAINNET_URL: &'static str = "https://id.waves.exchange/";
-    const TESTNET_URL: &'static str = "https://id-testnet.waves.exchange/";
-}
+impl BaseApi for Identity {}
 
 impl HttpClient<Identity> {
     pub async fn sign(

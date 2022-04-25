@@ -6,10 +6,7 @@ use crate::BaseApi;
 #[derive(Clone, Debug)]
 pub struct DataService;
 
-impl BaseApi for DataService {
-    const MAINNET_URL: &'static str = "https://api.wavesplatform.com/v0";
-    const TESTNET_URL: &'static str = "https://api-testnet.wavesplatform.com/v0";
-}
+impl BaseApi for DataService {}
 
 pub mod dto {
     use chrono::{DateTime, NaiveDateTime, Utc};

@@ -14,10 +14,7 @@ pub enum HistoryQuery {
 #[derive(Clone, Debug)]
 pub struct StateService;
 
-impl BaseApi for StateService {
-    const MAINNET_URL: &'static str = "https://waves.exchange/api/v1/state";
-    const TESTNET_URL: &'static str = "https://testnet.waves.exchange/api/v1/state";
-}
+impl BaseApi for StateService {}
 
 impl HttpClient<StateService> {
     pub async fn entries(

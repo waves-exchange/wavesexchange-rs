@@ -1,6 +1,6 @@
+use crate::common::MAINNET;
 use chrono::{Date, NaiveDate, Utc};
-use wavesexchange_apis::test_configs::blockchains::MAINNET;
-use wavesexchange_apis::{data_service::dto, mainnet_client, DataService};
+use wavesexchange_apis::{data_service::dto, DataService, HttpClient};
 
 const WAVES: &str = "WAVES";
 const BTC: &str = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS";
@@ -9,7 +9,7 @@ const USDN_ASSET_ID: &str = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p";
 
 #[tokio::test]
 async fn fetch_rates_batch_from_data_service() {
-    let rates = mainnet_client::<DataService>()
+    let rates = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
         .rates(
             MAINNET::matcher,
             vec![(WAVES, BTC), (NON_TRADABLE_ASSET, WAVES)],
@@ -29,7 +29,7 @@ async fn fetch_invokes_control_contract_finalize_current_price_v2() {
     // example invoke TS: 2021-06-21T16:38:52
     let timestamp_lt = NaiveDate::from_ymd(2021, 06, 21).and_hms(16, 38, 53);
 
-    let invokes = mainnet_client::<DataService>()
+    let invokes = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
         .invoke_script_transactions(
             None::<Vec<String>>,
             None,
@@ -74,7 +74,7 @@ async fn fetch_invokes_control_contract_finalize_current_price_v2() {
 async fn get_exchange_transactions() {
     let date = Date::from_utc(NaiveDate::from_ymd(2021, 05, 01), Utc);
 
-    let txs_resp = mainnet_client::<DataService>()
+    let txs_resp = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
         .transactions_exchange(
             Option::<String>::None,
             Some(WAVES),

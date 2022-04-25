@@ -1,10 +1,5 @@
-use wavesexchange_apis::{
-    mainnet_client,
-    models::dto::DataEntry,
-    node::dto,
-    test_configs::blockchains::{MAINNET, TESTNET},
-    testnet_client, Node,
-};
+use crate::common::{MAINNET, TESTNET};
+use wavesexchange_apis::{models::dto::DataEntry, node::dto, HttpClient, Node};
 
 #[tokio::test]
 async fn data_entries() {
@@ -13,7 +8,7 @@ async fn data_entries() {
         .map(|sym| format!("%s%s__price__{}", sym))
         .collect();
 
-    let mut data_entries = mainnet_client::<Node>()
+    let mut data_entries = HttpClient::<Node>::from_base_url(MAINNET::node_url)
         .data_entries(MAINNET::defo_control_contract, keys)
         .await
         .unwrap();
@@ -27,7 +22,7 @@ async fn data_entries() {
 
 #[tokio::test]
 async fn evaluate() {
-    let result = testnet_client::<Node>()
+    let result = HttpClient::<Node>::from_base_url(TESTNET::node_url)
         .evaluate(
             &TESTNET::products[0].contract_address,
             "privateCurrentSysParamsREST(\"5Sh9KghfkZyhjwuodovDhB6PghDUGBHiAPZ4MkrPgKtX\")",
