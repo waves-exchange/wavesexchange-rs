@@ -19,7 +19,7 @@ pub mod MAINNET {
     pub const lp_rest_contract: &str = "3P8MoPnsaurofk1VyhsdAFkeQ6ijpJYXCpW";
 
     // upstream
-    pub const data_service_url: &str = "https://api.wavesplatform.com/v0";
+    pub const data_service_url: &str = "https://waves.exchange/api/v1/forward/data_service/v0";
     pub const node_url: &str = "https://nodes.waves.exchange";
     pub const matcher_api_url: &str = "https://matcher.waves.exchange/matcher/settings/rates";
     pub const state_service_url: &str = "https://waves.exchange/api/v1/state";
@@ -75,7 +75,8 @@ pub mod TESTNET {
     pub const lp_rest_contract: &str = "3MsNhK6uve98J6DeqbuwGFBRh9GoHPGUFgp";
 
     // upstream
-    pub const data_service_url: &str = "https://api-testnet.wavesplatform.com";
+    pub const data_service_url: &str =
+        "https://testnet.waves.exchange/api/v1/forward/data_service/v0";
     pub const node_url: &str = "https://nodes-testnet.wavesnodes.com";
     pub const matcher_api_url: &str =
         "https://matcher-testnet.waves.exchange/matcher/settings/rates";
