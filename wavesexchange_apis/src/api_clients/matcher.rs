@@ -52,16 +52,3 @@ pub mod dto {
         pub message: serde_json::Value,
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tests::blockchains::TESTNET;
-
-    #[tokio::test]
-    async fn test_assets_from_matcher() {
-        let client = HttpClient::<Matcher>::from_base_url(TESTNET::matcher_api_url);
-        let resp = client.get().await.unwrap();
-        assert_eq!(resp["WAVES"], BigDecimal::from(1));
-    }
-}

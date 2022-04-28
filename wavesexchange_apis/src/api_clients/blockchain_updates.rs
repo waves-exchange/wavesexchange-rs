@@ -164,7 +164,7 @@ impl From<Vec<BalanceUpdate>> for AddressBalances {
             })
             .into_grouping_map()
             .aggregate(|acc, _, (asset_id, amount_before, amount_after)| {
-                let mut balances = acc.unwrap_or_else(AssetBalances::default);
+                let mut balances: AssetBalances = acc.unwrap_or_default();
                 let change = AmountChange {
                     before: amount_before,
                     after: amount_after,

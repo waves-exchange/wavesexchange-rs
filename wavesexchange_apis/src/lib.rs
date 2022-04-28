@@ -1,6 +1,5 @@
 mod clients;
 mod error;
-mod tests;
 
 pub mod api_clients;
 pub mod models;
