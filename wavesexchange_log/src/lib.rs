@@ -228,7 +228,10 @@ pub mod scopetimer {
                     format_args!("END   {}: elapsed {}ms", name, elapsed_ms),
                 );
             } else {
-                print(level, format_args!("{}: completed in {}ms", name, elapsed_ms));
+                print(
+                    level,
+                    format_args!("{}: completed in {}ms", name, elapsed_ms),
+                );
             }
         }
     }

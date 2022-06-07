@@ -4,8 +4,6 @@ version = "0.2.1"
 authors = ["Alexander Tuktarov <ATuktarov@web3tech.ru>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 thiserror = { version = "1.0" }
 serde = { version = "1.0", features = ["derive"] }
