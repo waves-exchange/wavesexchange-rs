@@ -614,6 +614,7 @@ pub enum TransactionType {
     SetAssetScript,
     InvokeScript,
     UpdateAssetInfo,
+    InvokeExpression,
 }
 
 impl std::fmt::Display for TransactionType {
@@ -637,6 +638,7 @@ impl std::fmt::Display for TransactionType {
             Self::SetAssetScript => "set_asset_script",
             Self::InvokeScript => "invoke_script",
             Self::UpdateAssetInfo => "update_asset_info",
+            Self::InvokeExpression => "invoke_expression",
         };
         write!(f, "{}", s)
     }
@@ -665,6 +667,7 @@ impl FromStr for TransactionType {
             "set_asset_script" => Self::SetAssetScript,
             "invoke_script" => Self::InvokeScript,
             "update_asset_info" => Self::UpdateAssetInfo,
+            "invoke_expression" => Self::InvokeExpression,
             _ => return Err(Error::InvalidTransactionType(s.to_string())),
         };
         Ok(transaction_type)
