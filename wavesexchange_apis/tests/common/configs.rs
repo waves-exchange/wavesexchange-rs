@@ -24,7 +24,6 @@ pub mod MAINNET {
     pub const matcher_api_url: &str = "https://matcher.waves.exchange/matcher/settings/rates";
     pub const state_service_url: &str = "https://waves.exchange/api/v1/state";
     pub const assets_service_url: &str = "https://waves.exchange/api/v1/assets";
-    pub const levex_api_url: &str = "https://api.levex.fi";
     pub const blockchain_updates_url: &str = "https://blockchain-updates.waves.exchange";
 
     // assets
@@ -82,7 +81,6 @@ pub mod TESTNET {
         "https://matcher-testnet.waves.exchange/matcher/settings/rates";
     pub const state_service_url: &str = "https://testnet.waves.exchange/api/v1/state";
     pub const assets_service_url: &str = "https://testnet.waves.exchange/api/v1/assets";
-    pub const levex_api_url: &str = "https://api.levex.fi";
     pub const blockchain_updates_url: &str = "https://blockchain-updates-testnet.waves.exchange";
 
     // assets
