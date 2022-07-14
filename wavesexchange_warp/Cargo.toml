@@ -12,3 +12,6 @@ serde_json = "1.0"
 serde_qs = "0.8"
 warp = "0.3"
 wavesexchange_log = { path = "../wavesexchange_log", version = "0.5" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "time"] }
