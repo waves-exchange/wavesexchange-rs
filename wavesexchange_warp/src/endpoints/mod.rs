@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::{fmt::Display, future::Future};
 use warp::{
+    filters::BoxedFilter,
     http::StatusCode,
     reply::{json, with_status, Response},
     Filter, Rejection, Reply,
@@ -48,27 +49,40 @@ pub fn livez() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> 
     warp::path("livez").map(HealthcheckReply::ok)
 }
 
-pub fn readyz<E, F, Ch>(
-    readiness_checker: Ch,
-) -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone
-where
-    E: Display,
-    F: Future<Output = Result<(), E>> + Send + Sync + 'static,
-    Ch: Fn() -> F + Clone + Send + Sync + 'static,
+pub fn readyz() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone {
+    warp::path("readyz").map(HealthcheckReply::ok)
+}
+
+pub trait Checkz:
+    Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Send + Sync + 'static
 {
-    warp::path("readyz").and_then(move || {
-        let rc = readiness_checker.clone();
-        async move {
-            Ok::<_, Rejection>(match rc().await {
-                Ok(_) => HealthcheckReply::ok(),
-                Err(e) => HealthcheckReply::err(e.to_string()),
-            })
-        }
-    })
+    fn with_checker<E, F, C>(self, checker: C) -> BoxedFilter<(HealthcheckReply,)>
+    where
+        E: Display,
+        F: Future<Output = Result<(), E>> + Send + Sync + 'static,
+        C: Fn() -> F + Clone + Send + Sync + 'static,
+    {
+        Filter::boxed(self.and_then(move |hc: HealthcheckReply| {
+            let ch = checker.clone();
+            async move {
+                Ok::<_, Rejection>(match (hc.err, ch().await) {
+                    (None, Ok(_)) => HealthcheckReply::ok(),
+                    (Some(err), _) => HealthcheckReply::err(err),
+                    (_, Err(err)) => HealthcheckReply::err(err.to_string()),
+                })
+            }
+        }))
+    }
+}
+
+impl<F> Checkz for F where
+    F: Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Send + Sync + 'static
+{
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use serde_json::Value;
     use warp::test;
@@ -83,9 +97,16 @@ mod tests {
 
     #[tokio::test]
     async fn check_readiness() {
-        let filters = readyz(|| async { Err("not enough racoons") });
-        let result = test::request().path("/readyz").reply(&filters).await;
+        let request = test::request().path("/readyz");
+        let filters = readyz().with_checker(|| async { Err("not enough racoons") });
+        let result = request.reply(&filters).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
         assert_eq!(result["status"], "not enough racoons");
+
+        let request = test::request().path("/readyz");
+        let filters = readyz();
+        let result = request.reply(&filters).await;
+        let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
+        assert_eq!(result["status"], "ok");
     }
 }
