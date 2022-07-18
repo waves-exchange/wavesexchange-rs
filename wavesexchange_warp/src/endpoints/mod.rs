@@ -53,6 +53,10 @@ pub fn readyz() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection>
     warp::path("readyz").map(HealthcheckReply::ok)
 }
 
+pub fn startz() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone {
+    warp::path("startz").map(HealthcheckReply::ok)
+}
+
 pub trait Checkz:
     Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Send + Sync + 'static
 {
