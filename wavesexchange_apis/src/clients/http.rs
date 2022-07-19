@@ -146,7 +146,7 @@ impl From<StatusCode> for StatusCodes {
     }
 }
 
-type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult<T>> + Send + Sync>;
+type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult<T>> + Send>;
 
 /// Optional helper struct for handling requests-responses
 ///
@@ -193,10 +193,10 @@ where
     pub fn handle_status_code<Fut>(
         mut self,
         code: impl Into<StatusCodes>,
-        handler: impl FnOnce(Response) -> Fut + Send + Sync + 'static,
+        handler: impl FnOnce(Response) -> Fut + Send + 'static,
     ) -> Self
     where
-        Fut: Future<Output = ApiResult<T>> + Send + Sync + 'static,
+        Fut: Future<Output = ApiResult<T>> + Send + 'static,
     {
         self.status_handlers
             .insert(code.into(), Box::new(move |resp| Box::pin(handler(resp))));

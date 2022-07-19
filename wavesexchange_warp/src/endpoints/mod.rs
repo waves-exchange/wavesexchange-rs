@@ -74,7 +74,7 @@ where
 {
     fn with_checker<F, C>(self, checker: C) -> BoxedFilter<(HealthcheckReply,)>
     where
-        F: Future<Output = Result<(), E>> + Shared,
+        F: Future<Output = Result<(), E>> + Send,
         C: FnOnce() -> F + Clone + Shared,
     {
         Filter::boxed(self.and_then(move |hc: HealthcheckReply| {
