@@ -8,6 +8,10 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
+pub const LIVEZ_URL: &str = "livez";
+pub const READYZ_URL: &str = "readyz";
+pub const STARTZ_URL: &str = "startz";
+
 pub trait Shared: Send + Sync + 'static {}
 impl<T> Shared for T where T: Send + Sync + 'static {}
 
@@ -56,15 +60,15 @@ impl Reply for HealthcheckReply {
 }
 
 pub fn livez() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone {
-    warp::path("livez").map(HealthcheckReply::ok)
+    warp::path(LIVEZ_URL).map(HealthcheckReply::ok)
 }
 
 pub fn readyz() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone {
-    warp::path("readyz").map(HealthcheckReply::ok)
+    warp::path(READYZ_URL).map(HealthcheckReply::ok)
 }
 
 pub fn startz() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone {
-    warp::path("startz").map(HealthcheckReply::ok)
+    warp::path(STARTZ_URL).map(HealthcheckReply::ok)
 }
 
 pub trait Checkz<E>:
@@ -129,7 +133,7 @@ mod tests {
     #[tokio::test]
     async fn complex() {
         struct Str {
-            c: String,
+            _c: String,
         }
 
         async fn ctrl_test(_repo: Arc<Str>) -> Result<(), Rejection> {
@@ -139,9 +143,9 @@ mod tests {
         let request = test::request().path("/startz");
 
         let s = Arc::new(Str {
-            c: String::from("test"),
+            _c: String::from("test"),
         });
-        let filters = readyz().with_checker(|| async { ctrl_test(s).await });
+        let filters = startz().with_checker(|| async { ctrl_test(s).await });
         let result = request.reply(&filters).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
         assert_eq!(result["status"], "not enough racoons");
