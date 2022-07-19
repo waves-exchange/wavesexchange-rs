@@ -87,7 +87,7 @@ impl<A: BaseApi> HttpClient<A> {
         &self,
         req: RequestBuilder,
         req_info: RS,
-    ) -> WXRequestHandler<A, T, RS> {
+    ) -> WXRequestHandler<A, T> {
         WXRequestHandler::from_request(self, req, req_info)
     }
 }
@@ -146,7 +146,7 @@ impl From<StatusCode> for StatusCodes {
     }
 }
 
-type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult<T>> + Send>;
+type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult<T>> + Send + Sync>;
 
 /// Optional helper struct for handling requests-responses
 ///
@@ -160,29 +160,31 @@ type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult
 ///     )
 ///     .execute()
 /// ```
-pub(crate) struct WXRequestHandler<'cli, A, T, RS>
+pub(crate) struct WXRequestHandler<'cli, A, T>
 where
     A: BaseApi,
     T: DeserializeOwned,
-    RS: Into<String> + Clone + Send,
 {
     client: &'cli HttpClient<A>,
     req: RequestBuilder,
-    req_info: RS,
+    req_info: String,
     status_handlers: HashMap<StatusCodes, StatusHandler<T>>,
 }
 
-impl<'cli, A, T, RS> WXRequestHandler<'cli, A, T, RS>
+impl<'cli, A, T> WXRequestHandler<'cli, A, T>
 where
     A: BaseApi,
     T: DeserializeOwned,
-    RS: Into<String> + Clone + Send,
 {
-    pub fn from_request(client: &'cli HttpClient<A>, req: RequestBuilder, req_info: RS) -> Self {
+    pub fn from_request(
+        client: &'cli HttpClient<A>,
+        req: RequestBuilder,
+        req_info: impl Into<String>,
+    ) -> Self {
         let this = Self {
             client,
             req,
-            req_info,
+            req_info: req_info.into(),
             status_handlers: HashMap::new(),
         };
         this.set_default_handlers()
@@ -191,10 +193,10 @@ where
     pub fn handle_status_code<Fut>(
         mut self,
         code: impl Into<StatusCodes>,
-        handler: impl FnOnce(Response) -> Fut + Send + 'static,
+        handler: impl FnOnce(Response) -> Fut + Send + Sync + 'static,
     ) -> Self
     where
-        Fut: Future<Output = ApiResult<T>> + Send + 'static,
+        Fut: Future<Output = ApiResult<T>> + Send + Sync + 'static,
     {
         self.status_handlers
             .insert(code.into(), Box::new(move |resp| Box::pin(handler(resp))));
@@ -202,7 +204,7 @@ where
     }
 
     fn set_default_handlers(self) -> Self {
-        let req_info = self.req_info.clone().into();
+        let req_info = self.req_info.clone();
         let req_info_ = req_info.clone();
         self.handle_status_code(
             StatusCodes::Concrete(StatusCode::OK),
