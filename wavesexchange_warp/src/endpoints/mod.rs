@@ -82,9 +82,9 @@ where
         C: FnOnce() -> F + Clone + Shared,
     {
         Filter::boxed(self.and_then(move |hc: HealthcheckReply| {
-            let ch = checker.clone();
+            let checker = checker.clone();
             async move {
-                Ok::<_, Rejection>(match (hc.err, ch().await) {
+                Ok::<_, Rejection>(match (hc.err, checker().await) {
                     (None, Ok(_)) => HealthcheckReply::ok(),
                     (Some(err), _) => HealthcheckReply::err(err),
                     (_, Err(err)) => HealthcheckReply::err(err),
@@ -104,7 +104,6 @@ mod tests {
 
     use super::*;
     use serde_json::Value;
-    use std::sync::Arc;
     use warp::test;
 
     #[tokio::test]
@@ -131,23 +130,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn complex() {
+    async fn check_send_bounds() {
+        #[derive(Clone)]
         struct Str {
             _c: String,
         }
 
-        async fn ctrl_test(_repo: Arc<Str>) -> Result<(), Rejection> {
+        async fn ctrl_test(_s: Str) -> Result<(), Rejection> {
             Ok(())
         }
 
         let request = test::request().path("/startz");
 
-        let s = Arc::new(Str {
+        let s = Str {
             _c: String::from("test"),
-        });
+        };
         let filters = startz().with_checker(|| async { ctrl_test(s).await });
         let result = request.reply(&filters).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
-        assert_eq!(result["status"], "not enough racoons");
+        assert_eq!(result["status"], "ok");
     }
 }
