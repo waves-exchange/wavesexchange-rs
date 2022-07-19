@@ -1,11 +1,15 @@
 use serde::Serialize;
-use std::{fmt::Display, future::Future};
+use std::fmt::Debug;
+use std::future::Future;
 use warp::{
     filters::BoxedFilter,
     http::StatusCode,
     reply::{json, with_status, Response},
     Filter, Rejection, Reply,
 };
+
+pub trait Shared: Send + Sync + 'static {}
+impl<T> Shared for T where T: Send + Sync + 'static {}
 
 #[derive(Clone)]
 pub struct HealthcheckReply {
@@ -17,9 +21,9 @@ impl HealthcheckReply {
         Self { err: None }
     }
 
-    pub fn err(msg: impl Into<String>) -> Self {
+    pub fn err<E: Debug>(msg: E) -> Self {
         Self {
-            err: Some(msg.into()),
+            err: Some(format!("{msg:?}")),
         }
     }
 }
@@ -29,17 +33,23 @@ struct StatusResponse {
     status: String,
 }
 
+impl Reply for StatusResponse {
+    fn into_response(self) -> Response {
+        json(&self).into_response()
+    }
+}
+
 impl Reply for HealthcheckReply {
     fn into_response(self) -> Response {
         match self.err {
             Some(e) => with_status(
-                json(&StatusResponse { status: e }),
+                StatusResponse { status: e },
                 StatusCode::INTERNAL_SERVER_ERROR,
             )
             .into_response(),
-            None => json(&StatusResponse {
+            None => StatusResponse {
                 status: "ok".to_owned(),
-            })
+            }
             .into_response(),
         }
     }
@@ -57,14 +67,15 @@ pub fn startz() -> impl Filter<Extract = (HealthcheckReply,), Error = Rejection>
     warp::path("startz").map(HealthcheckReply::ok)
 }
 
-pub trait Checkz:
-    Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Send + Sync + 'static
+pub trait Checkz<E>:
+    Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Shared
+where
+    E: Debug + Shared,
 {
-    fn with_checker<E, F, C>(self, checker: C) -> BoxedFilter<(HealthcheckReply,)>
+    fn with_checker<F, C>(self, checker: C) -> BoxedFilter<(HealthcheckReply,)>
     where
-        E: Display,
-        F: Future<Output = Result<(), E>> + Send + Sync + 'static,
-        C: Fn() -> F + Clone + Send + Sync + 'static,
+        F: Future<Output = Result<(), E>> + Shared,
+        C: FnOnce() -> F + Clone + Shared,
     {
         Filter::boxed(self.and_then(move |hc: HealthcheckReply| {
             let ch = checker.clone();
@@ -72,15 +83,15 @@ pub trait Checkz:
                 Ok::<_, Rejection>(match (hc.err, ch().await) {
                     (None, Ok(_)) => HealthcheckReply::ok(),
                     (Some(err), _) => HealthcheckReply::err(err),
-                    (_, Err(err)) => HealthcheckReply::err(err.to_string()),
+                    (_, Err(err)) => HealthcheckReply::err(err),
                 })
             }
         }))
     }
 }
 
-impl<F> Checkz for F where
-    F: Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Send + Sync + 'static
+impl<F, E: Debug + Shared> Checkz<E> for F where
+    F: Filter<Extract = (HealthcheckReply,), Error = Rejection> + Clone + Shared
 {
 }
 
@@ -89,6 +100,7 @@ mod tests {
 
     use super::*;
     use serde_json::Value;
+    use std::sync::Arc;
     use warp::test;
 
     #[tokio::test]
@@ -112,5 +124,26 @@ mod tests {
         let result = request.reply(&filters).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
         assert_eq!(result["status"], "ok");
+    }
+
+    #[tokio::test]
+    async fn complex() {
+        struct Str {
+            c: String,
+        }
+
+        async fn ctrl_test(_repo: Arc<Str>) -> Result<(), Rejection> {
+            Ok(())
+        }
+
+        let request = test::request().path("/startz");
+
+        let s = Arc::new(Str {
+            c: String::from("test"),
+        });
+        let filters = readyz().with_checker(|| async { ctrl_test(s).await });
+        let result = request.reply(&filters).await;
+        let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
+        assert_eq!(result["status"], "not enough racoons");
     }
 }
