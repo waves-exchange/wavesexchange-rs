@@ -120,7 +120,7 @@ mod tests {
         let filters = readyz().with_checker(|| async { Err("not enough racoons") });
         let result = request.reply(&filters).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
-        assert_eq!(result["status"], "not enough racoons");
+        assert_eq!(result["status"], format!("{:?}", "not enough racoons"));
 
         let request = test::request().path("/readyz");
         let filters = readyz();
