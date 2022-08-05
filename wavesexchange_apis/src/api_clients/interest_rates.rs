@@ -28,6 +28,6 @@ pub mod dto {
     #[derive(Debug, Clone, Deserialize)]
     pub struct AnnualRate {
         pub income_type: String,
-        pub rate: f64,
+        pub rate: Option<f64>,
     }
 }
