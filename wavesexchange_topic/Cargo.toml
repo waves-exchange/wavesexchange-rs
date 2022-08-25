@@ -1,12 +1,15 @@
 [package]
 name = "wavesexchange_topic"
 version = "0.2.2"
-authors = ["Alexander Tuktarov <ATuktarov@web3tech.ru>"]
+authors = ["Alexander Tuktarov <ATuktarov@web3tech.ru>", "Alex Kordys <akordys@web3tech.ru>"]
 edition = "2018"
 
 [dependencies]
-thiserror = { version = "1.0" }
-serde = { version = "1.0", features = ["derive"] }
-serde_qs = "0.8"
-url = "2.2.0"
 percent-encoding = "2.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_qs = "0.10"
+thiserror = { version = "1.0" }
+url = "2.2.0"
+
+[dev-dependencies]
+anyhow = "1.0"
