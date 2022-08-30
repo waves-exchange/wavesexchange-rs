@@ -23,63 +23,66 @@ pub enum TopicKind {
 }
 
 /// A parsed Topic representation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TopicData {
     Config(ConfigResource),
     State(State),
     TestResource(TestResource),
-    BlockchainHeight,
+    BlockchainHeight(BlockchainHeight),
     Transaction(Transaction),
     LeasingBalance(LeasingBalance),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigResource {
     pub file: ConfigFile,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigFile {
     pub path: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum State {
     Single(StateSingle),
     MultiPatterns(StateMultiPatterns),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct StateSingle {
     pub address: String,
     pub key: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct StateMultiPatterns {
     pub addresses: Vec<String>,
     pub key_patterns: Vec<String>,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TestResource {
     pub path: String,
     pub query: Option<String>,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct BlockchainHeight;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Transaction {
     ByAddress(TransactionByAddress),
     Exchange(TransactionExchange),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TransactionByAddress {
     pub tx_type: TransactionType,
     pub address: String,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TransactionType {
     All,
     Genesis,
@@ -99,15 +102,16 @@ pub enum TransactionType {
     SetAssetScript,
     InvokeScript,
     UpdateAssetInfo,
+    InvokeExpression,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TransactionExchange {
     pub amount_asset: String,
     pub price_asset: String,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LeasingBalance {
     pub address: String,
 }
@@ -119,9 +123,9 @@ mod parse_and_format {
         use url::Url;
 
         use super::super::{
-            ConfigFile, ConfigResource, LeasingBalance, State, StateSingle, TestResource, Topic,
-            TopicData, TopicKind, Transaction, TransactionByAddress, TransactionExchange,
-            TransactionType,
+            BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateSingle,
+            TestResource, Topic, TopicData, TopicKind, Transaction, TransactionByAddress,
+            TransactionExchange, TransactionType,
         };
         use super::{maybe_string::MaybeString, serde_state, url_escape};
 
@@ -235,7 +239,7 @@ mod parse_and_format {
                             let query = url.query().unwrap(); // unwrap is safe here
                             let st = serde_state::state_query_decode(query)
                                 .map_err(|()| TopicParseError::InvalidStateTopic)?;
-                            let query = serde_state::state_query_encode(st)
+                            let query = serde_state::state_query_encode(&st)
                                 .map_err(|()| TopicParseError::InvalidStateTopic)?;
                             url.set_query(Some(&query));
                         }
@@ -350,7 +354,7 @@ mod parse_and_format {
                             query: url.query().map(|q| q.to_owned()),
                         }
                     }),
-                    TopicKind::BlockchainHeight => TopicData::BlockchainHeight,
+                    TopicKind::BlockchainHeight => TopicData::BlockchainHeight(BlockchainHeight),
                     TopicKind::Transaction => TopicData::Transaction({
                         let tx_type = query_get(url, "type")
                             .map(|s| TransactionType::parse(&*s).expect("tx_type"));
@@ -359,7 +363,7 @@ mod parse_and_format {
                             let price_asset = query_get(url, "price_asset");
                             let amount_asset = query_get(url, "amount_asset");
                             if let (Some(price_asset), Some(amount_asset)) =
-                            (price_asset, amount_asset)
+                                (price_asset, amount_asset)
                             {
                                 Some(TransactionExchange {
                                     amount_asset: amount_asset.to_string(),
@@ -440,6 +444,7 @@ mod parse_and_format {
                     "set_asset_script" => TransactionType::SetAssetScript,
                     "invoke_script" => TransactionType::InvokeScript,
                     "update_asset_info" => TransactionType::UpdateAssetInfo,
+                    "invoke_expression" => TransactionType::InvokeExpression,
                     _ => return None,
                 };
                 Some(transaction_type)
@@ -502,7 +507,7 @@ mod parse_and_format {
             }
             assert_eq!(
                 "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
-                topic_data.into_uri_string(),
+                topic_data.as_uri_string(),
             );
 
             // URL with properly percent-encoded chars should also work
@@ -517,7 +522,7 @@ mod parse_and_format {
             }
             assert_eq!(
                 "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
-                topic_data.into_uri_string(),
+                topic_data.as_uri_string(),
             );
 
             Ok(())
@@ -535,7 +540,7 @@ mod parse_and_format {
                 assert_eq!(transaction.address, "some_address".to_string());
                 assert_eq!(
                     "topic://transactions?type=all&address=some_address".to_string(),
-                    TopicData::Transaction(Transaction::ByAddress(transaction)).into_uri_string(),
+                    TopicData::Transaction(Transaction::ByAddress(transaction)).as_uri_string(),
                 );
             } else {
                 panic!("wrong transaction")
@@ -552,7 +557,7 @@ mod parse_and_format {
                 assert_eq!(transaction.address, "some_other_address".to_string());
                 assert_eq!(
                     "topic://transactions?type=issue&address=some_other_address".to_string(),
-                    TopicData::Transaction(Transaction::ByAddress(transaction)).into_uri_string()
+                    TopicData::Transaction(Transaction::ByAddress(transaction)).as_uri_string()
                 );
             }
 
@@ -563,7 +568,7 @@ mod parse_and_format {
             let topic_data = Topic::parse_str(
                 "topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe",
             )?
-                .data();
+            .data();
             let tx = topic_data
                 .as_transaction()
                 .ok_or(anyhow::anyhow!("bad test case"))?;
@@ -573,7 +578,7 @@ mod parse_and_format {
                 assert_eq!(
                     "topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe"
                         .to_string(),
-                    TopicData::Transaction(Transaction::Exchange(transaction)).into_uri_string()
+                    TopicData::Transaction(Transaction::Exchange(transaction)).as_uri_string()
                 );
             } else {
                 panic!("wrong exchange transaction")
@@ -645,13 +650,14 @@ mod parse_and_format {
                     Self::SetAssetScript => "set_asset_script",
                     Self::InvokeScript => "invoke_script",
                     Self::UpdateAssetInfo => "update_asset_info",
+                    Self::InvokeExpression => "invoke_expression",
                 };
                 write!(f, "{}", s)
             }
         }
 
         impl TopicData {
-            pub(in super::super) fn into_uri_string(self) -> String {
+            pub fn as_uri_string(&self) -> String {
                 let mut result = "topic://".to_string();
                 match self {
                     TopicData::Config(ConfigResource { file }) => {
@@ -676,7 +682,7 @@ mod parse_and_format {
                             result.push_str(query);
                         }
                     }
-                    TopicData::BlockchainHeight => {
+                    TopicData::BlockchainHeight(_) => {
                         result.push_str("blockchain_height");
                     }
                     TopicData::Transaction(Transaction::ByAddress(tx)) => {
@@ -706,16 +712,23 @@ mod parse_and_format {
         use serde::{Deserialize, Serialize};
 
         #[allow(non_snake_case)]
-        #[derive(Deserialize, Serialize)]
+        #[derive(Deserialize)]
         struct Data {
             address__in: Vec<String>,
             key__match_any: Vec<String>,
         }
 
-        pub(super) fn state_query_encode(v: StateMultiPatterns) -> Result<String, ()> {
-            let data = Data {
-                address__in: v.addresses,
-                key__match_any: v.key_patterns,
+        #[allow(non_snake_case)]
+        #[derive(Serialize)]
+        struct DataRef<'a> {
+            address__in: &'a [String],
+            key__match_any: &'a [String],
+        }
+
+        pub(super) fn state_query_encode(v: &StateMultiPatterns) -> Result<String, ()> {
+            let data = DataRef {
+                address__in: &v.addresses,
+                key__match_any: &v.key_patterns,
             };
 
             // Interestingly, this URL encoder does not replace '*' with '%2A' as per RFC-3986:
@@ -807,7 +820,7 @@ mod parse_and_format {
             ];
             for s in urls {
                 let topic = Topic::parse_str(s)?;
-                let other_s: String = topic.data().into_uri_string();
+                let other_s: String = topic.data().as_uri_string();
                 assert_eq!(*s, other_s);
             }
             Ok(())
@@ -908,10 +921,10 @@ impl TopicData {
         }
     }
 
-    pub fn is_blockchain_height(&self) -> bool {
+    pub fn as_blockchain_height(&self) -> Option<&BlockchainHeight> {
         match self {
-            TopicData::BlockchainHeight => true,
-            _ => false,
+            TopicData::BlockchainHeight(blockchain_height) => Some(blockchain_height),
+            _ => None,
         }
     }
 
@@ -929,8 +942,8 @@ impl TopicData {
         }
     }
 
-    pub fn into_topic(self) -> Topic {
-        let uri = self.into_uri_string();
+    pub fn as_topic(&self) -> Topic {
+        let uri = self.as_uri_string();
         Topic::parse_str(&uri).expect("internal error: can't parse URI created from TopicData")
     }
 }
@@ -968,4 +981,78 @@ fn test_eq_and_hash() -> anyhow::Result<()> {
         assert_eq!(hash1, hash2);
     }
     Ok(())
+}
+
+mod convert {
+    use super::{
+        BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateMultiPatterns,
+        StateSingle, TestResource, TopicData, Transaction, TransactionByAddress,
+        TransactionExchange,
+    };
+
+    impl Into<TopicData> for ConfigResource {
+        fn into(self) -> TopicData {
+            TopicData::Config(self)
+        }
+    }
+
+    impl Into<TopicData> for ConfigFile {
+        fn into(self) -> TopicData {
+            TopicData::Config(ConfigResource { file: self })
+        }
+    }
+
+    impl Into<TopicData> for State {
+        fn into(self) -> TopicData {
+            TopicData::State(self)
+        }
+    }
+
+    impl Into<TopicData> for StateSingle {
+        fn into(self) -> TopicData {
+            TopicData::State(State::Single(self))
+        }
+    }
+
+    impl Into<TopicData> for StateMultiPatterns {
+        fn into(self) -> TopicData {
+            TopicData::State(State::MultiPatterns(self))
+        }
+    }
+
+    impl Into<TopicData> for TestResource {
+        fn into(self) -> TopicData {
+            TopicData::TestResource(self)
+        }
+    }
+
+    impl Into<TopicData> for BlockchainHeight {
+        fn into(self) -> TopicData {
+            TopicData::BlockchainHeight(self)
+        }
+    }
+
+    impl Into<TopicData> for Transaction {
+        fn into(self) -> TopicData {
+            TopicData::Transaction(self)
+        }
+    }
+
+    impl Into<TopicData> for TransactionByAddress {
+        fn into(self) -> TopicData {
+            TopicData::Transaction(Transaction::ByAddress(self))
+        }
+    }
+
+    impl Into<TopicData> for TransactionExchange {
+        fn into(self) -> TopicData {
+            TopicData::Transaction(Transaction::Exchange(self))
+        }
+    }
+
+    impl Into<TopicData> for LeasingBalance {
+        fn into(self) -> TopicData {
+            TopicData::LeasingBalance(self)
+        }
+    }
 }
