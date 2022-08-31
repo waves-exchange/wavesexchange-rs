@@ -83,10 +83,10 @@ impl<A: BaseApi> HttpClient<A> {
         Ok(resp)
     }
 
-    pub(crate) fn create_req_handler<T: DeserializeOwned, RS: Into<String> + Clone + Send>(
+    pub(crate) fn create_req_handler<T: DeserializeOwned>(
         &self,
         req: RequestBuilder,
-        req_info: RS,
+        req_info: impl Into<String> + Clone + Send,
     ) -> WXRequestHandler<A, T> {
         WXRequestHandler::from_request(self, req, req_info)
     }

@@ -68,7 +68,7 @@ impl HttpClient<StateService> {
 
         loop {
             let res: List<dto::DataEntry> = self
-                .create_req_handler::<dto::StateSearchResult, _>(
+                .create_req_handler::<dto::StateSearchResult>(
                     self.http_post("search").json(&qv),
                     "state::search",
                 )

@@ -71,7 +71,7 @@ impl HttpClient<DataService> {
         })
         .unwrap();
 
-        self.create_req_handler::<DSList<dto::InvokeScriptTransactionResponse>, _>(
+        self.create_req_handler::<DSList<dto::InvokeScriptTransactionResponse>>(
             self.http_get(format!("transactions/invoke-script?{url}"))
                 .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
             "data_service::invoke_script_transactions",
@@ -92,7 +92,7 @@ impl HttpClient<DataService> {
             timestamp.into(),
         );
 
-        self.create_req_handler::<DSList<dto::GenericTransactionResponse>, _>(
+        self.create_req_handler::<DSList<dto::GenericTransactionResponse>>(
             self.http_get(&url)
                 .header(HEADER_ORIGIN_NAME, HEADER_ORIGIN_VALUE),
             "data_service::last_exchange_transaction_to_date",
@@ -138,7 +138,7 @@ impl HttpClient<DataService> {
 
         let url = format!("transactions/exchange?{query_string}");
 
-        self.create_req_handler::<DSList<dto::Data<dto::ExchangeTransaction>>, _>(
+        self.create_req_handler::<DSList<dto::Data<dto::ExchangeTransaction>>>(
             self.http_get(&url),
             "data_service::transactions_exchange",
         )
