@@ -1,3 +1,5 @@
+pub mod metrics;
+
 use serde::Serialize;
 use std::fmt::Debug;
 use std::future::Future;
