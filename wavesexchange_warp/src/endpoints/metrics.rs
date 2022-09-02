@@ -37,6 +37,14 @@ async fn metrics_handler() -> Result<impl Reply, Rejection> {
     Ok(result)
 }
 
+/// Run two warp instances.
+///
+/// The first one contains needed routes that will be count in `/metrics` report.
+/// The second serves `/metrics` and default liveness endpoints (livez/startz/readyz) without checker fns.
+/// To setup checker on z-endpoint, don't add any filter to `routes`,
+/// use instead `extra_liveness_routes` argument: `Some(livez().with_checker(...))`
+///
+/// `stats_port` is used to define custom port of second instance. Default value is `port` + `STATS_PORT_OFFSET`
 pub async fn run_warp_with_stats<F, R>(
     routes: F,
     port: u16,
