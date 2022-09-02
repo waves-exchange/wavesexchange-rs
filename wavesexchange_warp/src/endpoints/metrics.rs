@@ -44,7 +44,7 @@ pub async fn run_warp_with_stats<F, R>(
     stats_port: Option<u16>,
 ) where
     R: Reply,
-    F: Filter<Extract = (R,), Error = Rejection> + Clone + Shared,
+    F: Filter<Extract = (R,)> + Clone + Shared,
 {
     register_metrics();
 
