@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::time::Duration;
 
 use tokio::{spawn, time};
@@ -10,7 +11,7 @@ async fn test_run_stats_warp() {
     let stats_port = 9001;
     let url = format!("http://0.0.0.0:{port}");
     let stats_url = format!("http://0.0.0.0:{}", stats_port);
-    let routes = warp::path!("hello").map(|| "Hello, world!");
+    let routes = warp::path!("hello").and_then(|| async { Ok::<_, Infallible>("Hello, world!") });
 
     let warps = StatsWarpBuilder::from_routes(routes)
         .override_liveness_routes(

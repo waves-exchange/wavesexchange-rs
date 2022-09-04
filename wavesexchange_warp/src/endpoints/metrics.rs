@@ -19,9 +19,17 @@ lazy_static! {
 
 pub const STATS_PORT_OFFSET: u16 = 1010;
 
-pub trait SharedFilter<R>: Filter<Extract = (R,), Error = Rejection> + Clone + Shared {}
+pub trait SharedFilter<R, E: Into<Rejection> = Rejection>:
+    Filter<Extract = (R,), Error = E> + Clone + Shared
+{
+}
 
-impl<F, R> SharedFilter<R> for F where F: Filter<Extract = (R,), Error = Rejection> + Clone + Shared {}
+impl<R, E, F> SharedFilter<R, E> for F
+where
+    E: Into<Rejection>,
+    F: Filter<Extract = (R,), Error = E> + Clone + Shared,
+{
+}
 
 fn estimate_request(info: Info) {
     REQUESTS.inc();
@@ -71,10 +79,11 @@ impl Default for StatsWarpBuilder {
 }
 
 impl StatsWarpBuilder {
-    pub fn from_routes<R, F>(routes: F) -> Self
+    pub fn from_routes<R, E, F>(routes: F) -> Self
     where
         R: Reply + 'static,
-        F: SharedFilter<R>,
+        E: Into<Rejection>,
+        F: SharedFilter<R, E>,
     {
         Self {
             main_routes: Some(deep_box_filter(routes)),
@@ -130,10 +139,11 @@ impl StatsWarpBuilder {
     }
 }
 
-fn deep_box_filter<R, F>(filter: F) -> DeepBoxedFilter
+fn deep_box_filter<R, E, F>(filter: F) -> DeepBoxedFilter
 where
     R: Reply + 'static,
-    F: SharedFilter<R>,
+    E: Into<Rejection>,
+    F: SharedFilter<R, E>,
 {
     filter.map(|f| Box::new(f) as Box<dyn Reply>).boxed()
 }
