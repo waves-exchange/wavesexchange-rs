@@ -47,7 +47,7 @@ type DeepBoxedFilter = BoxedFilter<(Box<dyn Reply>,)>;
 /// Instanciate the given optional warp instance and an extra listener that serves stats: liveness endpoints and metrics.
 ///
 /// The first instance contains needed routes that will be count in `/metrics` report.
-/// Can be skipped with `no_main_instance` if only stats required.
+/// Can be skipped with `StatsWarpBuilder::no_main_instance` if only stats required.
 /// The second serves `/metrics` and default liveness endpoints (livez/startz/readyz) without checker fns. Mandatory.
 ///
 /// Example:
@@ -107,7 +107,9 @@ impl StatsWarpBuilder {
         StatsWarpBuilder::default()
     }
 
-    /// Define custom port of second instance. Default value is `port` + `STATS_PORT_OFFSET`
+    /// Define custom port of stats instance.
+    /// Default value is `port` + `STATS_PORT_OFFSET` if main instance is present
+    /// and `port` if not
     pub fn set_stats_port(mut self, port: u16) -> Self {
         self.stats_port = Some(port);
         self
