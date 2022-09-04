@@ -2,22 +2,24 @@ use std::time::Duration;
 
 use tokio::{spawn, time};
 use warp::Filter;
-use wavesexchange_warp::endpoints::metrics::{run_warp_with_stats, STATS_PORT_OFFSET};
-use wavesexchange_warp::endpoints::{startz, Checkz};
+use wavesexchange_warp::endpoints::{startz, Checkz, StatsWarpBuilder};
 
 #[tokio::test]
 async fn test_run_stats_warp() {
     let port = 8080;
+    let stats_port = 9001;
     let url = format!("http://0.0.0.0:{port}");
-    let stats_url = format!("http://0.0.0.0:{}", port + STATS_PORT_OFFSET);
+    let stats_url = format!("http://0.0.0.0:{}", stats_port);
     let routes = warp::path!("hello").map(|| "Hello, world!");
 
-    spawn(run_warp_with_stats(
-        routes,
-        port,
-        Some(startz().with_checker(|| async { Err("still not enough racoons") })),
-        None,
-    ));
+    let warps = StatsWarpBuilder::from_routes(routes)
+        .override_liveness_routes(
+            startz().with_checker(|| async { Err("still not enough racoons") }),
+        )
+        .set_stats_port(stats_port)
+        .run(port);
+
+    spawn(warps);
     time::sleep(Duration::from_secs(1)).await; // wait for server
 
     let hello = reqwest::get(format!("{url}/hello"))
