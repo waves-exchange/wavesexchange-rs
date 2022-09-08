@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use tokio::{spawn, time};
 use warp::Filter;
-use wavesexchange_warp::endpoints::{startz, Checkz, StatsWarpBuilder};
+use wavesexchange_warp::StatsWarpBuilder;
 
 #[tokio::test]
 async fn test_run_stats_warp() {
@@ -15,7 +15,7 @@ async fn test_run_stats_warp() {
 
     let warps = StatsWarpBuilder::new()
         .with_main_routes(routes)
-        .with_liveness_routes(startz().with_checker(|| async { Err("still not enough racoons") }))
+        .with_startz_checker(|| async { Err("still not enough racoons") })
         .with_stats_port(stats_port)
         .run_blocking(port);
 

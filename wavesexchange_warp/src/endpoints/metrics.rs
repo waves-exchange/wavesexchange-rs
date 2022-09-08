@@ -1,10 +1,11 @@
 use super::{
     liveness::{LivenessReply, Shared},
-    livez, readyz, startz,
+    livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz,
 };
 use futures::future::join;
 use lazy_static::lazy_static;
 use prometheus::{core::Collector, HistogramOpts, HistogramVec, IntCounter, Registry, TextEncoder};
+use std::{fmt::Debug, future::Future};
 use warp::{filters::BoxedFilter, log::Info, Filter, Rejection, Reply};
 
 lazy_static! {
@@ -42,7 +43,7 @@ async fn metrics_handler(reg: Registry) -> impl Reply {
     TextEncoder::new().encode_to_string(&reg.gather()).unwrap()
 }
 
-type DeepBoxedFilter = BoxedFilter<(Box<dyn Reply>,)>;
+type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 
 /// A warp wrapper that provides liveness endpoints (`livez/startz/readyz`)
 /// and extensible metrics collection for gathering requests (or any) stats.
@@ -69,31 +70,28 @@ type DeepBoxedFilter = BoxedFilter<(Box<dyn Reply>,)>;
 pub struct StatsWarpBuilder {
     registry: Registry,
     main_routes: Option<DeepBoxedFilter>,
-    stats_routes: DeepBoxedFilter,
     stats_port: Option<u16>,
+    livez: DeepBoxedFilter<LivenessReply>,
+    readyz: DeepBoxedFilter<LivenessReply>,
+    startz: DeepBoxedFilter<LivenessReply>,
 }
 
 impl StatsWarpBuilder {
     /// Create and init builder with stats warp routes
     pub fn new() -> Self {
-        let registry = Registry::new();
-        let warp_registry = registry.clone();
-        let metrics_filter = warp::path!("metrics")
-            .and(warp::get())
-            .and(warp::any().map(move || warp_registry.clone()))
-            .then(metrics_handler);
-        let stats_routes = metrics_filter.or(livez()).or(readyz()).or(startz());
         Self {
             main_routes: None,
-            stats_routes: deep_box_filter(stats_routes),
             stats_port: None,
-            registry,
+            registry: Registry::new(),
+            livez: livez_fn().boxed(),
+            readyz: readyz_fn().boxed(),
+            startz: startz_fn().boxed(),
         }
     }
 
     /// Add routes for main warp instance
     ///
-    /// Note: you shouldn't provide liveness endpoints in your routes, use `with_liveness_routes` method instead
+    /// Note: you shouldn't provide liveness endpoints in your routes, use `with_*z_checker` methods instead
     pub fn with_main_routes<R, E, F>(mut self, routes: F) -> Self
     where
         R: Reply + 'static,
@@ -110,19 +108,33 @@ impl StatsWarpBuilder {
         self
     }
 
-    /// Overwrite any liveness endpoint. Other liveness endpoints will not be affected.
-    ///
-    /// Example:
-    /// ```rust
-    /// use wavesexchange_warp::endpoints::{livez, Checkz};
-    ///
-    /// StatsWarpBuilder::new()
-    ///     .with_liveness_routes(livez().with_checker(|| async { Ok(()) }))
-    ///     .run_blocking()
-    ///     .await;
-    /// ```
-    pub fn with_liveness_routes(mut self, routes: impl SharedFilter<LivenessReply>) -> Self {
-        self.stats_routes = deep_box_filter(routes.or(self.stats_routes));
+    pub fn with_livez_checker<F, C, E>(mut self, checker: C) -> Self
+    where
+        E: Debug + Shared,
+        F: Future<Output = Result<(), E>> + Send,
+        C: FnOnce() -> F + Clone + Shared,
+    {
+        self.livez = livez_fn().with_checker(checker).boxed();
+        self
+    }
+
+    pub fn with_readyz_checker<F, C, E>(mut self, checker: C) -> Self
+    where
+        E: Debug + Shared,
+        F: Future<Output = Result<(), E>> + Send,
+        C: FnOnce() -> F + Clone + Shared,
+    {
+        self.readyz = readyz_fn().with_checker(checker).boxed();
+        self
+    }
+
+    pub fn with_startz_checker<F, C, E>(mut self, checker: C) -> Self
+    where
+        E: Debug + Shared,
+        F: Future<Output = Result<(), E>> + Send,
+        C: FnOnce() -> F + Clone + Shared,
+    {
+        self.startz = startz_fn().with_checker(checker).boxed();
         self
     }
 
@@ -151,8 +163,10 @@ impl StatsWarpBuilder {
         let Self {
             main_routes,
             stats_port,
-            stats_routes,
-            ..
+            registry,
+            livez,
+            readyz,
+            startz,
         } = self;
 
         let host = [0, 0, 0, 0];
@@ -161,7 +175,12 @@ impl StatsWarpBuilder {
         } else {
             port
         });
-        let warp_stats_instance = warp::serve(stats_routes).run((host, stats_port));
+        let metrics_filter = warp::path!("metrics")
+            .and(warp::get())
+            .and(warp::any().map(move || registry.clone()))
+            .then(metrics_handler);
+        let warp_stats_instance =
+            warp::serve(metrics_filter.or(livez).or(readyz).or(startz)).run((host, stats_port));
 
         match main_routes {
             Some(routes) => {
