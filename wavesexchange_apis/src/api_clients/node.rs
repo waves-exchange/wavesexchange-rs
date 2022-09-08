@@ -75,22 +75,10 @@ impl HttpClient<Node> {
         &self,
         assets: impl IntoIterator<Item = impl Into<String>>,
     ) -> ApiResult<Option<Vec<dto::AssetDetail>>> {
-        let url = format!(
-            "assets/details?id={}",
-            join(
-                assets.into_iter().filter_map(|s| {
-                    let s = s.into();
-                    if s != "WAVES" {
-                        Some(s)
-                    } else {
-                        None
-                    }
-                }),
-                "&id="
-            )
-        );
-
-        self.create_req_handler(self.http_get(url), "node::assets_details")
+        let url = "assets/details".to_string();
+        let asset_ids = assets.into_iter().map(Into::into).collect::<Vec<_>>();
+        let data = json!({ "ids": asset_ids });
+        self.create_req_handler(self.http_post(url).json(&data), "node::assets_details")
             .handle_status_code(StatusCode::NOT_FOUND, |_| async { Ok(None) })
             .execute()
             .await
