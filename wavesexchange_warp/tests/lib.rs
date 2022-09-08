@@ -13,12 +13,11 @@ async fn test_run_stats_warp() {
     let stats_url = format!("http://0.0.0.0:{}", stats_port);
     let routes = warp::path!("hello").and_then(|| async { Ok::<_, Infallible>("Hello, world!") });
 
-    let warps = StatsWarpBuilder::from_routes(routes)
-        .override_liveness_routes(
-            startz().with_checker(|| async { Err("still not enough racoons") }),
-        )
-        .set_stats_port(stats_port)
-        .run(port);
+    let warps = StatsWarpBuilder::new()
+        .with_main_routes(routes)
+        .with_liveness_routes(startz().with_checker(|| async { Err("still not enough racoons") }))
+        .with_stats_port(stats_port)
+        .run_blocking(port);
 
     spawn(warps);
     time::sleep(Duration::from_secs(1)).await; // wait for server

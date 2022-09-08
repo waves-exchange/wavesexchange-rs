@@ -44,22 +44,27 @@ async fn metrics_handler(reg: Registry) -> impl Reply {
 
 type DeepBoxedFilter = BoxedFilter<(Box<dyn Reply>,)>;
 
-/// Instanciate the given optional warp instance and an extra listener that serves stats: liveness endpoints and metrics.
+/// A warp wrapper that provides liveness endpoints (`livez/startz/readyz`)
+/// and extensible metrics collection for gathering requests (or any) stats.
+/// Creates 1 or 2 warp instances.
 ///
-/// The first instance contains needed routes that will be count in `/metrics` report.
-/// Can be skipped with `StatsWarpBuilder::no_main_instance` if only stats required.
-/// The second serves `/metrics` and default liveness endpoints (livez/startz/readyz) without checker fns. Mandatory.
+/// The first instance serves `GET /metrics` route and
+/// liveness endpoints (without checker fns on default). Mandatory.
+///
+/// The second one contains main provided routes that will be count in `/metrics` report.
+/// If no routes provided, instance won't be created.
 ///
 /// Example:
 /// ```rust
 /// let routes = warp::path!("hello").and(warp::get());
 ///
-/// // run two warp instances on ports 8080 and 9090 (default port offset for stats is 1010),
-/// // stats port can be overriden via `set_stats_port`
-/// StatsWarpBuilder::from_routes(routes).run(8080).await;
+/// // run only stats instance on port 8080
+/// StatsWarpBuilder::new().run_blocking(8080).await;
 ///
-/// // run one stats instance on port 8080
-/// StatsWarpBuilder::no_main_instance().run(8080).await;
+/// // run two warp instances on ports 8080 (main routes) and 9090 (stats routes)
+/// // (default port for stats is main_routes_port + 1010),
+/// // stats port can be overriden via `with_stats_port`
+/// StatsWarpBuilder::new().with_main_routes(routes).run_blocking(8080).await;
 /// ```
 pub struct StatsWarpBuilder {
     registry: Registry,
@@ -68,8 +73,9 @@ pub struct StatsWarpBuilder {
     stats_port: Option<u16>,
 }
 
-impl Default for StatsWarpBuilder {
-    fn default() -> Self {
+impl StatsWarpBuilder {
+    /// Create and init builder with stats warp routes
+    pub fn new() -> Self {
         let registry = Registry::new();
         let warp_registry = registry.clone();
         let metrics_filter = warp::path!("metrics")
@@ -84,63 +90,63 @@ impl Default for StatsWarpBuilder {
             registry,
         }
     }
-}
 
-impl StatsWarpBuilder {
-    /// Create two warp instances: for given routes and for stats.  
+    /// Add routes for main warp instance
     ///
-    /// Note: you shouldn't provide overrides for liveness endpoints here, use `override_liveness_routes` method instead
-    pub fn from_routes<R, E, F>(routes: F) -> Self
+    /// Note: you shouldn't provide liveness endpoints in your routes, use `with_liveness_routes` method instead
+    pub fn with_main_routes<R, E, F>(mut self, routes: F) -> Self
     where
         R: Reply + 'static,
         E: Into<Rejection>,
         F: SharedFilter<R, E>,
     {
-        Self {
-            main_routes: Some(deep_box_filter(routes)),
-            ..Default::default()
-        }
-    }
-
-    /// Create only one warp stats instance
-    pub fn no_main_instance() -> Self {
-        StatsWarpBuilder::default()
+        self.main_routes = Some(deep_box_filter(routes));
+        self
     }
 
     /// Define custom port of stats instance.
-    /// Default value is `port` + `STATS_PORT_OFFSET` if main instance is present
-    /// and `port` if not
-    pub fn set_stats_port(mut self, port: u16) -> Self {
+    pub fn with_stats_port(mut self, port: u16) -> Self {
         self.stats_port = Some(port);
         self
     }
 
-    /// Add checker function to any liveness endpoint
+    /// Overwrite any liveness endpoint. Other liveness endpoints will not be affected.
     ///
     /// Example:
     /// ```rust
     /// use wavesexchange_warp::endpoints::{livez, Checkz};
     ///
-    /// StatsWarpBuilder::no_main_instance()
-    ///     .override_liveness_routes(livez().with_checker(|| async { Ok(()) }))
-    ///     .run
+    /// StatsWarpBuilder::new()
+    ///     .with_liveness_routes(livez().with_checker(|| async { Ok(()) }))
+    ///     .run_blocking()
     ///     .await;
     /// ```
-    pub fn override_liveness_routes(mut self, routes: impl SharedFilter<LivenessReply>) -> Self {
+    pub fn with_liveness_routes(mut self, routes: impl SharedFilter<LivenessReply>) -> Self {
         self.stats_routes = deep_box_filter(routes.or(self.stats_routes));
         self
     }
 
     /// Register prometheus metric. No need to `Box::new`.
-    pub fn add_metric(self, metric: impl Collector + 'static) -> Self {
-        self.registry.register(Box::new(metric)).unwrap();
+    ///
+    /// Note: if metric is created by `lazy_static!` or analogues, deref it first:
+    /// ```rust
+    /// .with_metric(&*MY_STATIC_METRIC)
+    /// ```
+    pub fn with_metric<M: Collector + Clone + 'static>(self, metric: &M) -> Self {
+        self.registry.register(Box::new(metric.clone())).unwrap();
         self
     }
 
-    pub async fn run(mut self, port: u16) {
+    /// Run warp instance(s) on current thread.
+    ///
+    /// Note: if running in a stats-only variant, `port` argument will be used for stats instance,
+    /// otherwise it will be used by main instance,
+    /// and stats will have `port + STATS_PORT_OFFSET` port
+    /// (or custom if was set explicitly with `with_stats_port`)
+    pub async fn run_blocking(mut self, port: u16) {
         self = self
-            .add_metric(REQUESTS.clone())
-            .add_metric(RESPONSE_DURATION.clone());
+            .with_metric(&*REQUESTS)
+            .with_metric(&*RESPONSE_DURATION);
 
         let Self {
             main_routes,
