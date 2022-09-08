@@ -1,600 +1,88 @@
-pub mod error;
+//! Subscription topic: an URI which can be parsed
+//! into a machine-readable data struct describing client's subscription.
 
-use error::Error;
-use std::{convert::TryFrom, str::FromStr};
+use std::sync::Arc;
 use url::Url;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Topic {
-    Config(ConfigParameters),
+pub use parse_and_format::parse::TopicParseError;
+
+/// A cheaply cloneable (`Arc` inside) subscription topic struct.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Topic {
+    topic_url: Arc<Url>,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub enum TopicKind {
+    Config,
+    State,
+    TestResource,
+    BlockchainHeight,
+    Transaction,
+    LeasingBalance,
+}
+
+/// A parsed Topic representation
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum TopicData {
+    Config(ConfigResource),
     State(State),
     TestResource(TestResource),
-    BlockchainHeight,
+    BlockchainHeight(BlockchainHeight),
     Transaction(Transaction),
     LeasingBalance(LeasingBalance),
 }
 
-#[test]
-fn topic_convert_test() {
-    let urls = [
-        "topic://config/some/path",
-        "topic://state/address/key",
-        "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern2",
-        "topic://test_resource/some/path?and_query=true",
-        "topic://blockchain_height",
-        "topic://transactions?type=all&address=some_address",
-        "topic://transactions?type=exchange&amount_asset=foo&price_asset=bar",
-        "topic://leasing_balance/some_address",
-    ];
-    for s in urls.iter() {
-        let topic = Topic::try_from(*s).unwrap();
-        let other_s: String = topic.into();
-        assert_eq!(*s, other_s);
-    }
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ConfigResource {
+    pub file: ConfigFile,
 }
 
-impl Topic {
-    /// Whether this topic can be expanded to a set of other topics.
-    pub fn is_multi_topic(&self) -> bool {
-        match self {
-            Topic::State(State::MultiPatterns(_)) => true,
-            _ => false,
-        }
-    }
-}
-
-#[test]
-fn topic_wildcard_test() {
-    let test_cases = [
-        ("topic://config/some/path", false),
-        ("topic://state/address/key", false),
-        ("topic://state?address__in[]=address&key__match_any[]=key", true),
-        (
-            "topic://state?address__in[]=a1&address__in[]=a2&key__match_any[]=p1&key__match_any[]=pattern2",
-            true,
-        ),
-        ("topic://test_resource/some/path?and_query=true", false),
-        ("topic://blockchain_height", false),
-        ("topic://transactions?type=all&address=some_address", false),
-        (
-            "topic://transactions?type=exchange&amount_asset=a&price_asset=p",
-            false,
-        ),
-        ("topic://leasing_balance/some_address", false),
-    ];
-    for (topic_url, expected_result) in test_cases {
-        let topic = Topic::try_from(topic_url).unwrap();
-        assert_eq!(
-            topic.is_multi_topic(),
-            expected_result,
-            "Failed: {}",
-            topic_url
-        );
-    }
-}
-
-impl TryFrom<&str> for Topic {
-    type Error = Error;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let url = Url::parse(s)?;
-
-        match url.host_str() {
-            Some("config") => {
-                let file = ConfigFile::try_from(url)?;
-                Ok(Topic::Config(ConfigParameters { file }))
-            }
-            Some("state") => {
-                let state = State::try_from(url)?;
-                Ok(Topic::State(state))
-            }
-            Some("test_resource") => {
-                let ps = TestResource::try_from(url)?;
-                Ok(Topic::TestResource(ps))
-            }
-            Some("blockchain_height") => Ok(Topic::BlockchainHeight),
-            Some("transactions") => {
-                let transaction = Transaction::try_from(url)?;
-                Ok(Topic::Transaction(transaction))
-            }
-            Some("leasing_balance") => {
-                let leasing_balance = LeasingBalance::try_from(url)?;
-                Ok(Topic::LeasingBalance(leasing_balance))
-            }
-            _ => Err(Error::InvalidTopic(s.to_owned())),
-        }
-    }
-}
-
-impl From<Topic> for String {
-    fn from(v: Topic) -> String {
-        let mut result = "topic://".to_string();
-        match v {
-            Topic::Config(cp) => result.push_str(&String::from(cp)),
-            Topic::State(state) => result.push_str(&String::from(state)),
-            Topic::TestResource(ps) => result.push_str(&String::from(ps)),
-            Topic::BlockchainHeight => result.push_str("blockchain_height"),
-            Topic::Transaction(tx) => result.push_str(&String::from(tx)),
-            Topic::LeasingBalance(leasing_balance) => {
-                result.push_str(&String::from(leasing_balance))
-            }
-        }
-        result
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigFile {
     pub path: String,
 }
 
-impl TryFrom<Url> for ConfigFile {
-    type Error = Error;
-
-    fn try_from(u: Url) -> Result<Self, Self::Error> {
-        Ok(ConfigFile {
-            path: u.path().to_owned(),
-        })
-    }
-}
-
-impl From<ConfigFile> for String {
-    fn from(v: ConfigFile) -> String {
-        "config".to_owned() + &v.path
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ConfigParameters {
-    pub file: ConfigFile,
-}
-
-impl From<ConfigParameters> for String {
-    fn from(v: ConfigParameters) -> String {
-        v.file.into()
-    }
-}
-
-impl TryFrom<Url> for ConfigParameters {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        let config_file = ConfigFile::try_from(value)?;
-        Ok(Self { file: config_file })
-    }
-}
-
-impl From<ConfigFile> for Topic {
-    fn from(v: ConfigFile) -> Self {
-        let cp = ConfigParameters { file: v };
-        cp.into()
-    }
-}
-
-impl From<ConfigParameters> for Topic {
-    fn from(v: ConfigParameters) -> Self {
-        Self::Config(v)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum State {
     Single(StateSingle),
     MultiPatterns(StateMultiPatterns),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct StateSingle {
     pub address: String,
     pub key: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct StateMultiPatterns {
     pub addresses: Vec<String>,
     pub key_patterns: Vec<String>,
 }
 
-mod serde_state {
-    use super::StateMultiPatterns;
-    use serde::{Deserialize, Serialize};
-
-    #[allow(non_snake_case)]
-    #[derive(Deserialize, Serialize)]
-    struct Data {
-        address__in: Vec<String>,
-        key__match_any: Vec<String>,
-    }
-
-    pub(super) fn state_query_encode(v: StateMultiPatterns) -> Result<String, ()> {
-        let data = Data {
-            address__in: v.addresses,
-            key__match_any: v.key_patterns,
-        };
-
-        // Interestingly, this URL encoder does not replace '*' with '%2A' as per RFC-3986:
-        // https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
-        // Same is for square brackets, '[' and ']'.
-        // Though, it does not introduce any ambiguities or errors, so we're fine here.
-        serde_qs::to_string(&data).map_err(|_| ())
-    }
-
-    pub(super) fn state_query_decode(s: &str) -> Result<StateMultiPatterns, ()> {
-        let data: Data = serde_qs::from_str(s).map_err(|_| ())?;
-        Ok(StateMultiPatterns {
-            addresses: data.address__in,
-            key_patterns: data.key__match_any,
-        })
-    }
-}
-
-mod url_escape {
-    use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
-    use std::borrow::Cow;
-
-    const ENCODABLE_SET: AsciiSet = NON_ALPHANUMERIC.remove(b'_');
-
-    pub(super) fn encode(s: &str) -> Cow<str> {
-        utf8_percent_encode(s, &ENCODABLE_SET).into()
-    }
-
-    pub(super) fn decode(s: &str) -> Cow<str> {
-        percent_decode_str(s).decode_utf8_lossy()
-    }
-}
-
-impl From<State> for String {
-    fn from(v: State) -> String {
-        match v {
-            State::Single(single) => single.into(),
-            State::MultiPatterns(multi) => multi.into(),
-        }
-    }
-}
-
-impl From<StateSingle> for String {
-    fn from(v: StateSingle) -> String {
-        let address = url_escape::encode(&v.address);
-        let key = url_escape::encode(&v.key);
-        format!("state/{}/{}", address, key)
-    }
-}
-
-impl From<StateMultiPatterns> for String {
-    fn from(v: StateMultiPatterns) -> String {
-        "state?".to_string() + &serde_state::state_query_encode(v).unwrap()
-    }
-}
-
-impl TryFrom<Url> for State {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        Ok(if value.query().is_none() {
-            Self::Single(StateSingle::try_from(value)?)
-        } else {
-            Self::MultiPatterns(StateMultiPatterns::try_from(value)?)
-        })
-    }
-}
-
-impl TryFrom<Url> for StateSingle {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        let params = value
-            .path_segments()
-            .ok_or_else(|| Error::InvalidStatePath(value.path().to_string()))?
-            .take(2)
-            .collect::<Vec<_>>();
-        if params.len() == 2 {
-            let address = url_escape::decode(params[0]).into_owned();
-            let key = url_escape::decode(params[1]).into_owned();
-            Ok(Self { address, key })
-        } else {
-            Err(Error::InvalidStatePath(value.path().to_string()))
-        }
-    }
-}
-
-impl TryFrom<Url> for StateMultiPatterns {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        use crate::error::ErrorQuery;
-        let query = value
-            .query()
-            .ok_or_else(|| Error::InvalidStateQuery(ErrorQuery(None)))?;
-        serde_state::state_query_decode(query)
-            .map_err(|_| Error::InvalidStateQuery(ErrorQuery(Some(query.to_owned()))))
-    }
-}
-
-impl From<State> for Topic {
-    fn from(v: State) -> Self {
-        Self::State(v)
-    }
-}
-
-impl From<StateSingle> for Topic {
-    fn from(v: StateSingle) -> Self {
-        Self::State(State::Single(v))
-    }
-}
-
-impl From<StateMultiPatterns> for Topic {
-    fn from(v: StateMultiPatterns) -> Self {
-        Self::State(State::MultiPatterns(v))
-    }
-}
-
-#[test]
-fn topic_state_test() {
-    let url = Url::parse("topic://state/some_address/some_key").unwrap();
-    let state = State::try_from(url).unwrap();
-    assert!(matches!(state, State::Single(_)));
-    if let State::Single(ref state) = state {
-        assert_eq!(state.address, "some_address".to_string());
-        assert_eq!(state.key, "some_key".to_string());
-    }
-
-    let url = Url::parse("topic://state/some_address/some_key/some_other_part_of_path").unwrap();
-    let state = State::try_from(url).unwrap();
-    assert!(matches!(state, State::Single(_)));
-    if let State::Single(ref state) = state {
-        assert_eq!(state.address, "some_address".to_string());
-        assert_eq!(state.key, "some_key".to_string());
-    }
-    let state_string: String = state.into();
-    assert_eq!("state/some_address/some_key".to_string(), state_string);
-
-    // URL with plain (not percent-encoded) character '*' should work
-    let url =
-        Url::parse("topic://state?address__in[]=addr1&address__in[]=addr2&key__match_any[]=pattern1&key__match_any[]=pattern*2").unwrap();
-    let state = State::try_from(url).unwrap();
-    assert!(matches!(state, State::MultiPatterns(_)));
-    if let State::MultiPatterns(ref state) = state {
-        assert_eq!(state.addresses, vec!["addr1", "addr2"]);
-        assert_eq!(state.key_patterns, vec!["pattern1", "pattern*2"]);
-    }
-    let state_string: String = state.into();
-    assert_eq!(
-        "state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
-        state_string
-    );
-
-    // URL with properly percent-encoded chars should also work
-    let url =
-        Url::parse("topic://state?address__in[]=addr1&address__in[]=addr2&key__match_any[]=pattern1&key__match_any[]=pattern%2A2")
-            .unwrap();
-    let state = State::try_from(url).unwrap();
-    assert!(matches!(state, State::MultiPatterns(_)));
-    if let State::MultiPatterns(ref state) = state {
-        assert_eq!(state.addresses, vec!["addr1", "addr2"]);
-        assert_eq!(state.key_patterns, vec!["pattern1", "pattern*2"]);
-    }
-    let state_string: String = state.into();
-    assert_eq!(
-        "state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
-        state_string
-    );
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TestResource {
     pub path: String,
     pub query: Option<String>,
 }
 
-impl From<TestResource> for String {
-    fn from(v: TestResource) -> String {
-        let mut s = "test_resource".to_owned() + &v.path;
-        if let Some(ref query) = v.query {
-            s = s + "?" + query;
-        }
-        s
-    }
-}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct BlockchainHeight;
 
-impl TryFrom<Url> for TestResource {
-    type Error = Error;
-
-    fn try_from(u: Url) -> Result<Self, Self::Error> {
-        Ok(Self {
-            path: u.path().to_string(),
-            query: u.query().map(|q| q.to_owned()),
-        })
-    }
-}
-
-impl From<TestResource> for Topic {
-    fn from(v: TestResource) -> Self {
-        Self::TestResource(v)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BlockchainHeight {}
-
-impl TryFrom<Url> for BlockchainHeight {
-    type Error = Error;
-
-    fn try_from(_value: Url) -> Result<Self, Self::Error> {
-        Ok(Self {})
-    }
-}
-
-impl From<BlockchainHeight> for String {
-    fn from(_: BlockchainHeight) -> String {
-        "blockchain_height".to_string()
-    }
-}
-
-impl From<BlockchainHeight> for Topic {
-    fn from(_: BlockchainHeight) -> Self {
-        Self::BlockchainHeight
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Transaction {
     ByAddress(TransactionByAddress),
     Exchange(TransactionExchange),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TransactionExchange {
-    pub amount_asset: String,
-    pub price_asset: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TransactionByAddress {
     pub tx_type: TransactionType,
     pub address: String,
 }
 
-impl TryFrom<Url> for Transaction {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        if let Ok(raw_tx_type) = query_utils::get(&value, "type") {
-            let tx_type = FromStr::from_str(raw_tx_type.as_str())?;
-            match tx_type {
-                TransactionType::Exchange => {
-                    if let Ok(tx) = TransactionExchange::try_from(value.clone()) {
-                        return Ok(Self::Exchange(tx));
-                    }
-                }
-                _ => (),
-            }
-        }
-        let tx = TransactionByAddress::try_from(value)?;
-        Ok(Self::ByAddress(tx))
-    }
-}
-
-impl TryFrom<Url> for TransactionByAddress {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        let get_value_from_query =
-            |url, key| query_utils::get(url, key).map_err(|e| Error::InvalidTransactionQuery(e));
-        let tx_type = if let Ok(raw_tx_type) = get_value_from_query(&value, "type") {
-            FromStr::from_str(raw_tx_type.as_str())?
-        } else {
-            TransactionType::All
-        };
-        let address = get_value_from_query(&value, "address")?;
-        Ok(Self { tx_type, address })
-    }
-}
-
-impl TryFrom<Url> for TransactionExchange {
-    type Error = Error;
-
-    fn try_from(value: Url) -> Result<Self, Self::Error> {
-        let get_value_from_query =
-            |url, key| query_utils::get(url, key).map_err(|e| Error::InvalidTransactionQuery(e));
-        let price_asset = get_value_from_query(&value, "price_asset")?;
-        let amount_asset = get_value_from_query(&value, "amount_asset")?;
-        Ok(Self {
-            amount_asset,
-            price_asset,
-        })
-    }
-}
-
-impl From<Transaction> for String {
-    fn from(v: Transaction) -> String {
-        match v {
-            Transaction::ByAddress(by_address) => by_address.into(),
-            Transaction::Exchange(exchange) => exchange.into(),
-        }
-    }
-}
-
-impl From<TransactionByAddress> for String {
-    fn from(v: TransactionByAddress) -> String {
-        format!("transactions?type={}&address={}", v.tx_type, v.address)
-    }
-}
-
-impl From<TransactionExchange> for String {
-    fn from(v: TransactionExchange) -> String {
-        format!(
-            "transactions?type=exchange&amount_asset={}&price_asset={}",
-            v.amount_asset, v.price_asset
-        )
-    }
-}
-
-impl From<Transaction> for Topic {
-    fn from(v: Transaction) -> Self {
-        Self::Transaction(v)
-    }
-}
-
-impl From<TransactionByAddress> for Topic {
-    fn from(v: TransactionByAddress) -> Self {
-        Self::Transaction(Transaction::ByAddress(v))
-    }
-}
-
-impl From<TransactionExchange> for Topic {
-    fn from(v: TransactionExchange) -> Self {
-        Self::Transaction(Transaction::Exchange(v))
-    }
-}
-
-#[test]
-fn transaction_topic_test() {
-    let url = Url::parse("topic://transactions?type=all&address=some_address").unwrap();
-    if let Transaction::ByAddress(transaction) = Transaction::try_from(url).unwrap() {
-        assert_eq!(transaction.tx_type.to_string(), "all".to_string());
-        assert_eq!(transaction.address, "some_address".to_string());
-        assert_eq!(
-            "topic://transactions?type=all&address=some_address".to_string(),
-            String::from(Topic::Transaction(Transaction::ByAddress(transaction)))
-        );
-    } else {
-        panic!("wrong transaction")
-    }
-    let url = Url::parse("topic://transactions?type=issue&address=some_other_address").unwrap();
-    if let Transaction::ByAddress(transaction) = Transaction::try_from(url).unwrap() {
-        assert_eq!(transaction.tx_type.to_string(), "issue".to_string());
-        assert_eq!(transaction.address, "some_other_address".to_string());
-        assert_eq!(
-            "topic://transactions?type=issue&address=some_other_address".to_string(),
-            String::from(Topic::Transaction(Transaction::ByAddress(transaction)))
-        );
-    }
-    let url = Url::parse("topic://transactions").unwrap();
-    let error = Transaction::try_from(url);
-    assert!(error.is_err());
-    assert_eq!(
-        format!("{}", error.unwrap_err()),
-        "InvalidTransactionQuery: None".to_string()
-    );
-    let url =
-        Url::parse("topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe").unwrap();
-    if let Transaction::Exchange(transaction) = Transaction::try_from(url).unwrap() {
-        assert_eq!(transaction.amount_asset, "asd".to_string());
-        assert_eq!(transaction.price_asset, "qwe".to_string());
-        assert_eq!(
-            "topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe".to_string(),
-            String::from(Topic::Transaction(Transaction::Exchange(transaction)))
-        );
-    } else {
-        panic!("wrong exchange transaction")
-    }
-    let url =
-        Url::parse("topic://transactions?type=exchange&amount_asset=asd&price_asset=").unwrap();
-    let error = Transaction::try_from(url);
-    assert!(error.is_err());
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TransactionType {
     All,
     Genesis,
@@ -617,127 +105,954 @@ pub enum TransactionType {
     InvokeExpression,
 }
 
-impl std::fmt::Display for TransactionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Self::All => "all",
-            Self::Genesis => "genesis",
-            Self::Payment => "payment",
-            Self::Issue => "issue",
-            Self::Transfer => "transfer",
-            Self::Reissue => "reissue",
-            Self::Burn => "burn",
-            Self::Exchange => "exchange",
-            Self::Lease => "lease",
-            Self::LeaseCancel => "lease_cancel",
-            Self::Alias => "alias",
-            Self::MassTransfer => "mass_transfer",
-            Self::Data => "data",
-            Self::SetScript => "set_script",
-            Self::Sponsorship => "sponsorship",
-            Self::SetAssetScript => "set_asset_script",
-            Self::InvokeScript => "invoke_script",
-            Self::UpdateAssetInfo => "update_asset_info",
-            Self::InvokeExpression => "invoke_expression",
-        };
-        write!(f, "{}", s)
-    }
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct TransactionExchange {
+    pub amount_asset: String,
+    pub price_asset: String,
 }
 
-impl FromStr for TransactionType {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let transaction_type = match s {
-            "all" => Self::All,
-            "genesis" => Self::Genesis,
-            "payment" => Self::Payment,
-            "issue" => Self::Issue,
-            "transfer" => Self::Transfer,
-            "reissue" => Self::Reissue,
-            "burn" => Self::Burn,
-            "exchange" => Self::Exchange,
-            "lease" => Self::Lease,
-            "lease_cancel" => Self::LeaseCancel,
-            "alias" => Self::Alias,
-            "mass_transfer" => Self::MassTransfer,
-            "data" => Self::Data,
-            "set_script" => Self::SetScript,
-            "sponsorship" => Self::Sponsorship,
-            "set_asset_script" => Self::SetAssetScript,
-            "invoke_script" => Self::InvokeScript,
-            "update_asset_info" => Self::UpdateAssetInfo,
-            "invoke_expression" => Self::InvokeExpression,
-            _ => return Err(Error::InvalidTransactionType(s.to_string())),
-        };
-        Ok(transaction_type)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LeasingBalance {
     pub address: String,
 }
 
-impl From<LeasingBalance> for String {
-    fn from(v: LeasingBalance) -> String {
-        "leasing_balance/".to_string() + v.address.as_str()
-    }
-}
+mod parse_and_format {
+    pub(super) mod parse {
+        use std::{borrow::Cow, sync::Arc};
+        use thiserror::Error;
+        use url::Url;
 
-impl TryFrom<Url> for LeasingBalance {
-    type Error = Error;
+        use super::super::{
+            BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateSingle,
+            TestResource, Topic, TopicData, TopicKind, Transaction, TransactionByAddress,
+            TransactionExchange, TransactionType,
+        };
+        use super::{maybe_string::MaybeString, serde_state, url_escape};
 
-    fn try_from(url: Url) -> Result<Self, Self::Error> {
-        let mut address = None;
-        if let Some(mut path_segments) = url.path_segments() {
-            if let Some(address_segment) = path_segments.next() {
-                address = Some(address_segment.to_string())
+        #[derive(Debug, PartialEq, Eq, Error)]
+        pub enum TopicParseError {
+            #[error("Topic URI cannot be parsed: {0}")]
+            UrlParseError(#[from] url::ParseError),
+
+            #[error("Malformed topic")]
+            MalformedTopic,
+
+            #[error("Invalid topic kind: {0}")]
+            InvalidTopicKind(MaybeString),
+
+            #[error("Invalid 'config' topic")]
+            InvalidConfigTopic,
+
+            #[error("Invalid 'state' topic")]
+            InvalidStateTopic,
+
+            #[error("Invalid 'test resource' topic")]
+            InvalidTestResourceTopic,
+
+            #[error("Invalid 'blockchain height' topic")]
+            InvalidBlockchainHeightTopic,
+
+            #[error("Invalid 'transaction' topic")]
+            InvalidTransactionTopic,
+
+            #[error("Invalid 'leasing balance' topic")]
+            InvalidLeasingBalanceTopic,
+
+            #[error("Invalid transaction type: {0}")]
+            InvalidTransactionType(MaybeString),
+        }
+
+        impl Topic {
+            pub fn parse_str(topic_uri: &str) -> Result<Self, TopicParseError> {
+                let mut url = Url::parse(topic_uri)?;
+                Self::validate_and_canonicalize_topic_url(&mut url)?;
+
+                Ok(Topic {
+                    topic_url: Arc::new(url),
+                })
+            }
+
+            fn validate_and_canonicalize_topic_url(url: &mut Url) -> Result<(), TopicParseError> {
+                if url.scheme() != "topic"
+                    || url.cannot_be_a_base()
+                    || url.username() != ""
+                    || url.password().is_some()
+                    || url.fragment().is_some()
+                    || url.port().is_some()
+                {
+                    return Err(TopicParseError::MalformedTopic);
+                }
+
+                let topic_kind_str = url
+                    .host_str()
+                    .ok_or(TopicParseError::InvalidTopicKind(MaybeString(None)))?;
+
+                let topic_kind = TopicKind::parse(topic_kind_str).ok_or_else(|| {
+                    TopicParseError::InvalidTopicKind(MaybeString(Some(topic_kind_str.to_owned())))
+                })?;
+
+                fn is_empty(s: Option<impl AsRef<str>>) -> bool {
+                    match s {
+                        None => true,
+                        Some(s) => s.as_ref().is_empty(),
+                    }
+                }
+
+                match topic_kind {
+                    TopicKind::Config => {
+                        let config_file_path = url.path();
+                        if config_file_path.is_empty() || url.query().is_some() {
+                            return Err(TopicParseError::InvalidConfigTopic);
+                        }
+                    }
+                    TopicKind::State => {
+                        let is_single = url.query().is_none();
+                        if is_single {
+                            // unwrap() is safe here because we've already checked for `cannot_be_a_base()`
+                            let mut path_segments = url.path_segments().unwrap();
+                            let address = path_segments.next();
+                            let key = path_segments.next();
+                            if is_empty(address) || is_empty(key) || path_segments.next().is_some()
+                            {
+                                return Err(TopicParseError::InvalidStateTopic);
+                            }
+                            // Canonicalize
+                            url.set_path(&format!(
+                                "{}/{}",
+                                url_escape::encode(
+                                    address.map(url_escape::decode).unwrap().as_ref()
+                                ),
+                                url_escape::encode(key.map(url_escape::decode).unwrap().as_ref())
+                            ));
+                        } else {
+                            let is_ok = url.query_pairs().all(|(k, v)| {
+                                let key = url_escape::decode(&*k);
+                                let key_ok = key.starts_with("address__in[")
+                                    || key.starts_with("key__match_any[");
+                                let value_ok = !v.is_empty();
+                                key_ok && value_ok
+                            });
+                            if !is_ok {
+                                return Err(TopicParseError::InvalidStateTopic);
+                            }
+                            // Canonicalize
+                            let query = url.query().unwrap(); // unwrap is safe here
+                            let st = serde_state::state_query_decode(query)
+                                .map_err(|()| TopicParseError::InvalidStateTopic)?;
+                            let query = serde_state::state_query_encode(&st)
+                                .map_err(|()| TopicParseError::InvalidStateTopic)?;
+                            url.set_query(Some(&query));
+                        }
+                    }
+                    TopicKind::TestResource => {
+                        let is_ok = !url.path().is_empty() || !is_empty(url.query());
+                        if !is_ok {
+                            return Err(TopicParseError::InvalidTestResourceTopic);
+                        }
+                    }
+                    TopicKind::BlockchainHeight => {
+                        let is_ok = url.path().is_empty() && is_empty(url.query());
+                        if !is_ok {
+                            return Err(TopicParseError::InvalidBlockchainHeightTopic);
+                        }
+                    }
+                    TopicKind::Transaction => {
+                        let tx_type = query_get(url, "type")
+                            .map(|s| {
+                                TransactionType::parse(&*s).ok_or_else(|| {
+                                    TopicParseError::InvalidTransactionType(
+                                        MaybeString::from_emptyable_str(&*s),
+                                    )
+                                })
+                            })
+                            .transpose()?;
+
+                        let is_exchange = if matches!(tx_type, Some(TransactionType::Exchange)) {
+                            let price_asset = query_get(url, "price_asset");
+                            let amount_asset = query_get(url, "amount_asset");
+                            let has_price_asset = !is_empty(price_asset);
+                            let has_amount_asset = !is_empty(amount_asset);
+                            if has_price_asset != has_amount_asset {
+                                return Err(TopicParseError::InvalidTransactionTopic);
+                            }
+                            has_price_asset && has_amount_asset
+                        } else {
+                            false
+                        };
+
+                        let address = query_get(url, "address");
+
+                        let is_ok = if is_exchange {
+                            is_empty(address)
+                        } else {
+                            !is_empty(address)
+                        };
+
+                        if !is_ok {
+                            return Err(TopicParseError::InvalidTransactionTopic);
+                        }
+                    }
+                    TopicKind::LeasingBalance => {
+                        // unwrap() is safe here because we've already checked for `cannot_be_a_base()`
+                        let mut path_segments = url.path_segments().unwrap();
+                        let address = path_segments.next();
+                        if is_empty(address)
+                            || path_segments.next().is_some()
+                            || !is_empty(url.query())
+                        {
+                            return Err(TopicParseError::InvalidLeasingBalanceTopic);
+                        }
+                    }
+                }
+
+                Ok(())
             }
         }
-        if let Some(address) = address {
-            Ok(Self { address })
-        } else {
-            return Err(Error::InvalidLeasingPath(url.path().to_string()));
+
+        impl TopicData {
+            pub(in super::super) fn parse(topic: &Topic) -> Self {
+                let url = topic.topic_url.as_ref();
+
+                // This is checked by `validate()` during parse stage, so `expect()` is safe
+                let topic_kind_str = url.host_str().expect("host_str");
+
+                // Same safety guarantee
+                let topic_kind = TopicKind::parse(topic_kind_str).expect("topic_kind");
+
+                // URL is checked by `validate()` during parse stage, so all `expect()` calls are safe
+                match topic_kind {
+                    TopicKind::Config => {
+                        let config_file_path = url.path().to_owned();
+                        TopicData::Config(ConfigResource {
+                            file: ConfigFile {
+                                path: config_file_path,
+                            },
+                        })
+                    }
+                    TopicKind::State => TopicData::State({
+                        let is_single = url.query().is_none();
+                        if is_single {
+                            State::Single({
+                                let mut path = url.path_segments().expect("path_segments");
+                                let address =
+                                    url_escape::decode(path.next().expect("path[0]")).into_owned();
+                                let key =
+                                    url_escape::decode(path.next().expect("path[1]")).into_owned();
+                                assert!(path.next().is_none(), "path.length");
+                                StateSingle { address, key }
+                            })
+                        } else {
+                            State::MultiPatterns({
+                                let query = url.query().expect("query");
+                                serde_state::state_query_decode(query).expect("state_query_decode")
+                            })
+                        }
+                    }),
+                    TopicKind::TestResource => TopicData::TestResource({
+                        TestResource {
+                            path: url.path().to_owned(),
+                            query: url.query().map(|q| q.to_owned()),
+                        }
+                    }),
+                    TopicKind::BlockchainHeight => TopicData::BlockchainHeight(BlockchainHeight),
+                    TopicKind::Transaction => TopicData::Transaction({
+                        let tx_type = query_get(url, "type")
+                            .map(|s| TransactionType::parse(&*s).expect("tx_type"));
+
+                        let tx = if matches!(tx_type, Some(TransactionType::Exchange)) {
+                            let price_asset = query_get(url, "price_asset");
+                            let amount_asset = query_get(url, "amount_asset");
+                            if let (Some(price_asset), Some(amount_asset)) =
+                                (price_asset, amount_asset)
+                            {
+                                Some(TransactionExchange {
+                                    amount_asset: amount_asset.to_string(),
+                                    price_asset: price_asset.to_string(),
+                                })
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                        if let Some(tx) = tx {
+                            Transaction::Exchange(tx)
+                        } else {
+                            let address = query_get(url, "address").expect("address");
+                            let tx_type = tx_type.unwrap_or(TransactionType::All);
+                            Transaction::ByAddress(TransactionByAddress {
+                                tx_type,
+                                address: address.to_string(),
+                            })
+                        }
+                    }),
+                    TopicKind::LeasingBalance => TopicData::LeasingBalance({
+                        let mut path_segments = url.path_segments().expect("path_segments");
+                        let address = path_segments.next().expect("path[0]");
+                        assert!(path_segments.next().is_none(), "path.length");
+                        LeasingBalance {
+                            address: address.to_owned(),
+                        }
+                    }),
+                }
+            }
         }
-    }
-}
 
-impl From<LeasingBalance> for Topic {
-    fn from(v: LeasingBalance) -> Self {
-        Self::LeasingBalance(v)
-    }
-}
-
-#[test]
-fn leasing_balance_test() {
-    let url = Url::parse("topic://leasing_balance/some_address").unwrap();
-    let leasing_balance = LeasingBalance::try_from(url).unwrap();
-    assert_eq!(leasing_balance.address, "some_address".to_string());
-    let url = Url::parse("topic://leasing_balance/some_address/some_other_part_of_path").unwrap();
-    let leasing_balance = LeasingBalance::try_from(url).unwrap();
-    assert_eq!(leasing_balance.address, "some_address".to_string());
-    let leasing_balance_string: String = leasing_balance.into();
-    assert_eq!(
-        "leasing_balance/some_address".to_string(),
-        leasing_balance_string
-    );
-}
-
-mod query_utils {
-    use crate::error::ErrorQuery;
-    use url::Url;
-
-    pub(super) fn get(value: &Url, key: &str) -> Result<String, ErrorQuery> {
-        value
-            .query_pairs()
-            .find_map(|(k, v)| {
+        fn query_get<'a>(url: &'a Url, key: &str) -> Option<Cow<'a, str>> {
+            url.query_pairs().find_map(|(k, v)| {
                 if k == key && !v.is_empty() {
-                    Some(v.to_string())
+                    Some(v)
                 } else {
                     None
                 }
             })
-            .ok_or_else(|| ErrorQuery(value.query().map(ToString::to_string)))
+        }
+
+        impl TopicKind {
+            pub(in super::super) fn parse(s: &str) -> Option<Self> {
+                match s {
+                    "config" => Some(TopicKind::Config),
+                    "state" => Some(TopicKind::State),
+                    "test_resource" => Some(TopicKind::TestResource),
+                    "blockchain_height" => Some(TopicKind::BlockchainHeight),
+                    "transactions" => Some(TopicKind::Transaction),
+                    "leasing_balance" => Some(TopicKind::LeasingBalance),
+                    _ => None,
+                }
+            }
+        }
+
+        impl TransactionType {
+            fn parse(s: &str) -> Option<Self> {
+                let transaction_type = match s {
+                    "all" => TransactionType::All,
+                    "genesis" => TransactionType::Genesis,
+                    "payment" => TransactionType::Payment,
+                    "issue" => TransactionType::Issue,
+                    "transfer" => TransactionType::Transfer,
+                    "reissue" => TransactionType::Reissue,
+                    "burn" => TransactionType::Burn,
+                    "exchange" => TransactionType::Exchange,
+                    "lease" => TransactionType::Lease,
+                    "lease_cancel" => TransactionType::LeaseCancel,
+                    "alias" => TransactionType::Alias,
+                    "mass_transfer" => TransactionType::MassTransfer,
+                    "data" => TransactionType::Data,
+                    "set_script" => TransactionType::SetScript,
+                    "sponsorship" => TransactionType::Sponsorship,
+                    "set_asset_script" => TransactionType::SetAssetScript,
+                    "invoke_script" => TransactionType::InvokeScript,
+                    "update_asset_info" => TransactionType::UpdateAssetInfo,
+                    "invoke_expression" => TransactionType::InvokeExpression,
+                    _ => return None,
+                };
+                Some(transaction_type)
+            }
+        }
+
+        #[test]
+        fn topic_kind_test() -> anyhow::Result<()> {
+            let topic_urls = [
+                ("topic://config/some/path", TopicKind::Config),
+                ("topic://state/address/key", TopicKind::State),
+                ("topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern2", TopicKind::State),
+                ("topic://test_resource/some/path?and_query=true", TopicKind::TestResource),
+                ("topic://blockchain_height", TopicKind::BlockchainHeight),
+                ("topic://transactions?type=all&address=some_address", TopicKind::Transaction),
+                ("topic://transactions?type=exchange&amount_asset=foo&price_asset=bar", TopicKind::Transaction),
+                ("topic://leasing_balance/some_address", TopicKind::LeasingBalance),
+            ];
+            for &(topic_url, expected_kind) in topic_urls.iter() {
+                let url = Url::parse(topic_url)?;
+                let kind_str = url
+                    .host_str()
+                    .ok_or_else(|| anyhow::anyhow!("bad test case: {}", topic_url))?;
+                let kind = TopicKind::parse(kind_str)
+                    .ok_or_else(|| anyhow::anyhow!("bad test case: {}", kind_str))?;
+                assert_eq!(kind, expected_kind);
+                drop(url);
+
+                let topic = Topic::parse_str(topic_url)?;
+                let kind = topic.kind();
+                assert_eq!(kind, expected_kind);
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn topic_state_test() -> anyhow::Result<()> {
+            let topic_data = Topic::parse_str("topic://state/some_address/some_key")?.data();
+            let state = topic_data
+                .as_state()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            assert!(matches!(state, State::Single(_)));
+            if let State::Single(ref state) = state {
+                assert_eq!(state.address, "some_address".to_string());
+                assert_eq!(state.key, "some_key".to_string());
+            }
+
+            let error = Topic::parse_str("topic://state/some_address/some_key/invalid_part");
+            assert_eq!(error.unwrap_err(), TopicParseError::InvalidStateTopic);
+
+            // URL with plain (not percent-encoded) character '*' should work
+            let topic_data = Topic::parse_str("topic://state?address__in[]=addr1&address__in[]=addr2&key__match_any[]=pattern1&key__match_any[]=pattern*2")?.data();
+            let state = topic_data
+                .as_state()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            assert!(matches!(state, State::MultiPatterns(_)));
+            if let State::MultiPatterns(ref state) = state {
+                assert_eq!(state.addresses, vec!["addr1", "addr2"]);
+                assert_eq!(state.key_patterns, vec!["pattern1", "pattern*2"]);
+            }
+            assert_eq!(
+                "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
+                topic_data.as_uri_string(),
+            );
+
+            // URL with properly percent-encoded chars should also work
+            let topic_data = Topic::parse_str("topic://state?address__in[]=addr1&address__in[]=addr2&key__match_any[]=pattern1&key__match_any[]=pattern%2A2")?.data();
+            let state = topic_data
+                .as_state()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            assert!(matches!(state, State::MultiPatterns(_)));
+            if let State::MultiPatterns(ref state) = state {
+                assert_eq!(state.addresses, vec!["addr1", "addr2"]);
+                assert_eq!(state.key_patterns, vec!["pattern1", "pattern*2"]);
+            }
+            assert_eq!(
+                "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern*2".to_string(),
+                topic_data.as_uri_string(),
+            );
+
+            Ok(())
+        }
+
+        #[test]
+        fn transaction_topic_test() -> anyhow::Result<()> {
+            let topic_data =
+                Topic::parse_str("topic://transactions?type=all&address=some_address")?.data();
+            let tx = topic_data
+                .as_transaction()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            if let Transaction::ByAddress(transaction) = tx.clone() {
+                assert_eq!(transaction.tx_type.to_string(), "all".to_string());
+                assert_eq!(transaction.address, "some_address".to_string());
+                assert_eq!(
+                    "topic://transactions?type=all&address=some_address".to_string(),
+                    TopicData::Transaction(Transaction::ByAddress(transaction)).as_uri_string(),
+                );
+            } else {
+                panic!("wrong transaction")
+            }
+
+            let topic_data =
+                Topic::parse_str("topic://transactions?type=issue&address=some_other_address")?
+                    .data();
+            let tx = topic_data
+                .as_transaction()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            if let Transaction::ByAddress(transaction) = tx.clone() {
+                assert_eq!(transaction.tx_type.to_string(), "issue".to_string());
+                assert_eq!(transaction.address, "some_other_address".to_string());
+                assert_eq!(
+                    "topic://transactions?type=issue&address=some_other_address".to_string(),
+                    TopicData::Transaction(Transaction::ByAddress(transaction)).as_uri_string()
+                );
+            }
+
+            let error = Topic::parse_str("topic://transactions");
+            assert!(error.is_err());
+            assert_eq!(error.unwrap_err(), TopicParseError::InvalidTransactionTopic);
+
+            let topic_data = Topic::parse_str(
+                "topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe",
+            )?
+            .data();
+            let tx = topic_data
+                .as_transaction()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            if let Transaction::Exchange(transaction) = tx.clone() {
+                assert_eq!(transaction.amount_asset, "asd".to_string());
+                assert_eq!(transaction.price_asset, "qwe".to_string());
+                assert_eq!(
+                    "topic://transactions?type=exchange&amount_asset=asd&price_asset=qwe"
+                        .to_string(),
+                    TopicData::Transaction(Transaction::Exchange(transaction)).as_uri_string()
+                );
+            } else {
+                panic!("wrong exchange transaction")
+            }
+
+            let error = Topic::parse_str(
+                "topic://transactions?type=exchange&amount_asset=asd&price_asset=",
+            );
+            assert!(error.is_err());
+
+            Ok(())
+        }
+
+        #[test]
+        fn leasing_balance_test() -> anyhow::Result<()> {
+            let topic_data = Topic::parse_str("topic://leasing_balance/some_address")?.data();
+            let leasing_balance = topic_data
+                .as_leasing_balance()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+            assert_eq!(leasing_balance.address, "some_address".to_string());
+
+            let error = Topic::parse_str("topic://leasing_balance/some_address/invalid_part");
+            assert_eq!(
+                error.unwrap_err(),
+                TopicParseError::InvalidLeasingBalanceTopic,
+            );
+
+            Ok(())
+        }
+    }
+
+    mod format {
+        use crate::State;
+        use std::fmt;
+
+        use super::super::{ConfigResource, Topic, TopicData, Transaction, TransactionType};
+        use super::{serde_state, url_escape};
+
+        impl fmt::Debug for Topic {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "Topic('{}')", self.topic_url.as_str())
+            }
+        }
+
+        impl fmt::Display for Topic {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", self.topic_url.as_str())
+            }
+        }
+
+        impl fmt::Display for TransactionType {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let s = match self {
+                    Self::All => "all",
+                    Self::Genesis => "genesis",
+                    Self::Payment => "payment",
+                    Self::Issue => "issue",
+                    Self::Transfer => "transfer",
+                    Self::Reissue => "reissue",
+                    Self::Burn => "burn",
+                    Self::Exchange => "exchange",
+                    Self::Lease => "lease",
+                    Self::LeaseCancel => "lease_cancel",
+                    Self::Alias => "alias",
+                    Self::MassTransfer => "mass_transfer",
+                    Self::Data => "data",
+                    Self::SetScript => "set_script",
+                    Self::Sponsorship => "sponsorship",
+                    Self::SetAssetScript => "set_asset_script",
+                    Self::InvokeScript => "invoke_script",
+                    Self::UpdateAssetInfo => "update_asset_info",
+                    Self::InvokeExpression => "invoke_expression",
+                };
+                write!(f, "{}", s)
+            }
+        }
+
+        impl TopicData {
+            pub fn as_uri_string(&self) -> String {
+                let mut result = "topic://".to_string();
+                match self {
+                    TopicData::Config(ConfigResource { file }) => {
+                        result.push_str("config");
+                        result.push_str(file.path.as_str());
+                    }
+                    TopicData::State(State::Single(state)) => {
+                        let address = url_escape::encode(&state.address);
+                        let key = url_escape::encode(&state.key);
+                        result.push_str(&format!("state/{}/{}", address, key));
+                    }
+                    TopicData::State(State::MultiPatterns(state)) => {
+                        result.push_str("state?");
+                        result
+                            .push_str(&serde_state::state_query_encode(state).expect("urlencode"));
+                    }
+                    TopicData::TestResource(test_res) => {
+                        result.push_str("test_resource");
+                        result.push_str(test_res.path.as_str());
+                        if let Some(ref query) = test_res.query {
+                            result.push_str("?");
+                            result.push_str(query);
+                        }
+                    }
+                    TopicData::BlockchainHeight(_) => {
+                        result.push_str("blockchain_height");
+                    }
+                    TopicData::Transaction(Transaction::ByAddress(tx)) => {
+                        result.push_str(&format!(
+                            "transactions?type={}&address={}",
+                            tx.tx_type, tx.address
+                        ));
+                    }
+                    TopicData::Transaction(Transaction::Exchange(tx)) => {
+                        result.push_str(&format!(
+                            "transactions?type=exchange&amount_asset={}&price_asset={}",
+                            tx.amount_asset, tx.price_asset
+                        ));
+                    }
+                    TopicData::LeasingBalance(lb) => {
+                        result.push_str("leasing_balance/");
+                        result.push_str(lb.address.as_str());
+                    }
+                }
+                result
+            }
+        }
+    }
+
+    mod serde_state {
+        use super::super::StateMultiPatterns;
+        use serde::{Deserialize, Serialize};
+
+        #[allow(non_snake_case)]
+        #[derive(Deserialize)]
+        struct Data {
+            address__in: Vec<String>,
+            key__match_any: Vec<String>,
+        }
+
+        #[allow(non_snake_case)]
+        #[derive(Serialize)]
+        struct DataRef<'a> {
+            address__in: &'a [String],
+            key__match_any: &'a [String],
+        }
+
+        pub(super) fn state_query_encode(v: &StateMultiPatterns) -> Result<String, ()> {
+            let data = DataRef {
+                address__in: &v.addresses,
+                key__match_any: &v.key_patterns,
+            };
+
+            // Interestingly, this URL encoder does not replace '*' with '%2A' as per RFC-3986:
+            // https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
+            // Same is for square brackets, '[' and ']'.
+            // Though, it does not introduce any ambiguities or errors, so we're fine here.
+            serde_qs::to_string(&data).map_err(|_| ())
+        }
+
+        pub(super) fn state_query_decode(s: &str) -> Result<StateMultiPatterns, ()> {
+            let data: Data = serde_qs::from_str(s).map_err(|_| ())?;
+            Ok(StateMultiPatterns {
+                addresses: data.address__in,
+                key_patterns: data.key__match_any,
+            })
+        }
+    }
+
+    mod url_escape {
+        use percent_encoding::{
+            percent_decode_str, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC,
+        };
+        use std::borrow::Cow;
+
+        const ENCODABLE_SET: AsciiSet = NON_ALPHANUMERIC.remove(b'_');
+
+        pub(super) fn encode(s: &str) -> Cow<str> {
+            utf8_percent_encode(s, &ENCODABLE_SET).into()
+        }
+
+        pub(super) fn decode(s: &str) -> Cow<str> {
+            percent_decode_str(s).decode_utf8_lossy()
+        }
+    }
+
+    pub mod maybe_string {
+        use std::fmt;
+
+        #[derive(Clone, PartialEq, Eq)]
+        pub struct MaybeString(pub Option<String>);
+
+        impl MaybeString {
+            pub(super) fn from_emptyable_str(s: &str) -> Self {
+                if s.is_empty() {
+                    MaybeString(None)
+                } else {
+                    MaybeString(Some(s.to_owned()))
+                }
+            }
+        }
+
+        impl fmt::Debug for MaybeString {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.format(f)
+            }
+        }
+
+        impl fmt::Display for MaybeString {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.format(f)
+            }
+        }
+
+        impl MaybeString {
+            fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self.0.as_ref() {
+                    None => write!(f, "<Empty>"),
+                    Some(s) => write!(f, "'{}'", s.as_str()),
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::Topic;
+
+        #[test]
+        fn topic_convert_test() -> anyhow::Result<()> {
+            let urls = [
+                "topic://config/some/path",
+                "topic://state/address/key",
+                "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern2",
+                "topic://test_resource/some/path?and_query=true",
+                "topic://blockchain_height",
+                "topic://transactions?type=all&address=some_address",
+                "topic://transactions?type=exchange&amount_asset=foo&price_asset=bar",
+                "topic://leasing_balance/some_address",
+            ];
+            for s in urls {
+                let topic = Topic::parse_str(s)?;
+                let other_s: String = topic.data().as_uri_string();
+                assert_eq!(*s, other_s);
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn test_is_multi_topic() -> anyhow::Result<()> {
+            let test_cases = [
+                ("topic://config/some/path", false),
+                ("topic://state/address/key", false),
+                ("topic://state?address__in[]=address&key__match_any[]=key", true),
+                ("topic://state?address__in[]=a1&address__in[]=a2&key__match_any[]=p1&key__match_any[]=pattern2", true),
+                ("topic://test_resource/some/path?and_query=true", false),
+                ("topic://blockchain_height", false),
+                ("topic://transactions?type=all&address=some_address", false),
+                ("topic://transactions?type=exchange&amount_asset=a&price_asset=p", false),
+                ("topic://leasing_balance/some_address", false),
+            ];
+            for (topic_url, expected_result) in test_cases {
+                let topic = Topic::parse_str(topic_url)?;
+                assert_eq!(
+                    topic.is_multi_topic(),
+                    expected_result,
+                    "Failed: {}",
+                    topic_url
+                );
+                assert_eq!(
+                    topic.data().is_multi_topic(),
+                    expected_result,
+                    "Failed: {}",
+                    topic_url
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
+impl Topic {
+    pub fn kind(&self) -> TopicKind {
+        // This is checked by `validate()` during parse stage, so `expect()` is safe
+        let topic_kind_str = self.topic_url.host_str().expect("invariant broken: host");
+        // Same safety guarantee
+        TopicKind::parse(topic_kind_str).expect("invariant broken: topic_kind")
+    }
+
+    /// Whether this topic can be expanded to a set of other topics.
+    pub fn is_multi_topic(&self) -> bool {
+        self.kind() == TopicKind::State && self.topic_url.query().is_some()
+    }
+
+    pub fn data(&self) -> TopicData {
+        TopicData::parse(self)
+    }
+}
+
+impl TopicData {
+    /// Whether this topic can be expanded to a set of other topics.
+    pub fn is_multi_topic(&self) -> bool {
+        match self {
+            TopicData::State(State::MultiPatterns(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_config(&self) -> Option<&ConfigResource> {
+        match self {
+            TopicData::Config(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    pub fn as_state(&self) -> Option<&State> {
+        match self {
+            TopicData::State(state) => Some(state),
+            _ => None,
+        }
+    }
+
+    pub fn as_state_single(&self) -> Option<&StateSingle> {
+        match self {
+            TopicData::State(State::Single(state_single)) => Some(state_single),
+            _ => None,
+        }
+    }
+
+    pub fn as_state_multi(&self) -> Option<&StateMultiPatterns> {
+        match self {
+            TopicData::State(State::MultiPatterns(state_multi)) => Some(state_multi),
+            _ => None,
+        }
+    }
+
+    pub fn as_test_resource(&self) -> Option<&TestResource> {
+        match self {
+            TopicData::TestResource(test_res) => Some(test_res),
+            _ => None,
+        }
+    }
+
+    pub fn as_blockchain_height(&self) -> Option<&BlockchainHeight> {
+        match self {
+            TopicData::BlockchainHeight(blockchain_height) => Some(blockchain_height),
+            _ => None,
+        }
+    }
+
+    pub fn as_transaction(&self) -> Option<&Transaction> {
+        match self {
+            TopicData::Transaction(transaction) => Some(transaction),
+            _ => None,
+        }
+    }
+
+    pub fn as_leasing_balance(&self) -> Option<&LeasingBalance> {
+        match self {
+            TopicData::LeasingBalance(leasing_balance) => Some(leasing_balance),
+            _ => None,
+        }
+    }
+
+    pub fn as_topic(&self) -> Topic {
+        let uri = self.as_uri_string();
+        Topic::parse_str(&uri).expect("internal error: can't parse URI created from TopicData")
+    }
+}
+
+#[test]
+fn test_eq_and_hash() -> anyhow::Result<()> {
+    let hash = |topic: &Topic| {
+        use std::{
+            collections::hash_map::DefaultHasher,
+            hash::{Hash, Hasher},
+        };
+        let mut hasher = DefaultHasher::new();
+        topic.hash(&mut hasher);
+        hasher.finish()
+    };
+    let topic_urls = [
+        "topic://config/some/path",
+        "topic://state/address/key",
+        "topic://state?address__in[0]=addr1&address__in[1]=addr2&key__match_any[0]=pattern1&key__match_any[1]=pattern2",
+        "topic://test_resource/some/path?and_query=true",
+        "topic://blockchain_height",
+        "topic://transactions?type=all&address=some_address",
+        "topic://transactions?type=exchange&amount_asset=foo&price_asset=bar",
+        "topic://leasing_balance/some_address",
+    ];
+    for topic_url in topic_urls {
+        let topic1 = Topic::parse_str(topic_url)?;
+        let topic2 = Topic::parse_str(topic_url)?;
+
+        assert_eq!(topic1.to_string(), topic2.to_string());
+        assert_eq!(topic1, topic2);
+
+        let hash1 = hash(&topic1);
+        let hash2 = hash(&topic2);
+        assert_eq!(hash1, hash2);
+    }
+    Ok(())
+}
+
+mod convert {
+    use super::{
+        BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateMultiPatterns,
+        StateSingle, TestResource, TopicData, Transaction, TransactionByAddress,
+        TransactionExchange,
+    };
+
+    impl Into<TopicData> for ConfigResource {
+        fn into(self) -> TopicData {
+            TopicData::Config(self)
+        }
+    }
+
+    impl Into<TopicData> for ConfigFile {
+        fn into(self) -> TopicData {
+            TopicData::Config(ConfigResource { file: self })
+        }
+    }
+
+    impl Into<TopicData> for State {
+        fn into(self) -> TopicData {
+            TopicData::State(self)
+        }
+    }
+
+    impl Into<TopicData> for StateSingle {
+        fn into(self) -> TopicData {
+            TopicData::State(State::Single(self))
+        }
+    }
+
+    impl Into<TopicData> for StateMultiPatterns {
+        fn into(self) -> TopicData {
+            TopicData::State(State::MultiPatterns(self))
+        }
+    }
+
+    impl Into<TopicData> for TestResource {
+        fn into(self) -> TopicData {
+            TopicData::TestResource(self)
+        }
+    }
+
+    impl Into<TopicData> for BlockchainHeight {
+        fn into(self) -> TopicData {
+            TopicData::BlockchainHeight(self)
+        }
+    }
+
+    impl Into<TopicData> for Transaction {
+        fn into(self) -> TopicData {
+            TopicData::Transaction(self)
+        }
+    }
+
+    impl Into<TopicData> for TransactionByAddress {
+        fn into(self) -> TopicData {
+            TopicData::Transaction(Transaction::ByAddress(self))
+        }
+    }
+
+    impl Into<TopicData> for TransactionExchange {
+        fn into(self) -> TopicData {
+            TopicData::Transaction(Transaction::Exchange(self))
+        }
+    }
+
+    impl Into<TopicData> for LeasingBalance {
+        fn into(self) -> TopicData {
+            TopicData::LeasingBalance(self)
+        }
     }
 }
