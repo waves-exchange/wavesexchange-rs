@@ -20,6 +20,7 @@ pub enum TopicKind {
     BlockchainHeight,
     Transaction,
     LeasingBalance,
+    Pairs,
 }
 
 /// A parsed Topic representation
@@ -31,6 +32,7 @@ pub enum TopicData {
     BlockchainHeight(BlockchainHeight),
     Transaction(Transaction),
     LeasingBalance(LeasingBalance),
+    Pairs(Vec<ExchangePairs>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -116,11 +118,19 @@ pub struct LeasingBalance {
     pub address: String,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ExchangePairs {
+    pub amount_asset: String,
+    pub price_asset: String,
+}
+
 mod parse_and_format {
     pub(super) mod parse {
         use std::{borrow::Cow, sync::Arc};
         use thiserror::Error;
         use url::Url;
+
+        use crate::ExchangePairs;
 
         use super::super::{
             BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateSingle,
@@ -160,6 +170,9 @@ mod parse_and_format {
 
             #[error("Invalid transaction type: {0}")]
             InvalidTransactionType(MaybeString),
+
+            #[error("Invalid exchange pairs data")]
+            InvalidExchangePairs,
         }
 
         impl Topic {
@@ -303,9 +316,63 @@ mod parse_and_format {
                             return Err(TopicParseError::InvalidLeasingBalanceTopic);
                         }
                     }
+                    TopicKind::Pairs => {
+                        Topic::extract_exchange_pairs_from_query(&url)?;
+                    }
                 }
 
                 Ok(())
+            }
+
+            pub fn extract_exchange_pairs_from_query<'a>(
+                url: &'a Url,
+            ) -> Result<Vec<ExchangePairs>, TopicParseError> {
+                let mut ret = vec![];
+
+                match url.path_segments() {
+                    Some(mut parts) => {
+                        // topic://pairs/<amount_asset_id>/<price_asset_id>
+                        let amount_asset = parts.next();
+                        let price_asset = parts.next();
+
+                        if amount_asset.is_some() && price_asset.is_some() {
+                            ret.push({
+                                ExchangePairs {
+                                    amount_asset: amount_asset.unwrap().into(),
+                                    price_asset: price_asset.unwrap().into(),
+                                }
+                            });
+                            return Ok(ret);
+                        }
+
+                        // topic://pairs?pairs[]=amount_asset_id/price_asset_id&pairs[]=amount_asset_id1/price_asset_id1
+
+                        let pairs = query_get_vec(url, "pairs");
+                        match pairs {
+                            None => {
+                                return Err(TopicParseError::InvalidExchangePairs);
+                            }
+                            Some(pairs) => {
+                                for p in pairs {
+                                    if !p.contains("/") {
+                                        return Err(TopicParseError::InvalidExchangePairs);
+                                    }
+                                    let pair: Vec<&str> = p.split("/").collect();
+                                    let mut iter_pair = pair.iter();
+                                    let p = ExchangePairs {
+                                        amount_asset: (*iter_pair.next().unwrap()).into(),
+                                        price_asset: (*iter_pair.next().unwrap()).into(),
+                                    };
+
+                                    ret.push(p);
+                                }
+                            }
+                        }
+                    }
+                    None => {}
+                }
+
+                Ok(ret)
             }
         }
 
@@ -395,6 +462,9 @@ mod parse_and_format {
                             address: address.to_owned(),
                         }
                     }),
+                    TopicKind::Pairs => TopicData::Pairs(
+                        Topic::extract_exchange_pairs_from_query(&url).expect("pairs"),
+                    ),
                 }
             }
         }
@@ -409,6 +479,27 @@ mod parse_and_format {
             })
         }
 
+        fn query_get_vec<'a>(url: &'a Url, key: &str) -> Option<Vec<Cow<'a, str>>> {
+            let mut vals: Vec<Cow<_>> = vec![];
+
+            for i in url.query_pairs().into_iter() {
+                let k =
+                    i.0.replace("%5B", "")
+                        .replace("%5D", "")
+                        .replace("[", "")
+                        .replace("]", "");
+                if k == key && !(i.1).is_empty() {
+                    vals.push(i.1);
+                }
+            }
+
+            if vals.is_empty() {
+                return None;
+            }
+
+            Some(vals)
+        }
+
         impl TopicKind {
             pub(in super::super) fn parse(s: &str) -> Option<Self> {
                 match s {
@@ -418,6 +509,7 @@ mod parse_and_format {
                     "blockchain_height" => Some(TopicKind::BlockchainHeight),
                     "transactions" => Some(TopicKind::Transaction),
                     "leasing_balance" => Some(TopicKind::LeasingBalance),
+                    "pairs" => Some(TopicKind::Pairs),
                     _ => None,
                 }
             }
@@ -462,6 +554,8 @@ mod parse_and_format {
                 ("topic://transactions?type=all&address=some_address", TopicKind::Transaction),
                 ("topic://transactions?type=exchange&amount_asset=foo&price_asset=bar", TopicKind::Transaction),
                 ("topic://leasing_balance/some_address", TopicKind::LeasingBalance),
+                ("topic://pairs/amount_asset/price_asset", TopicKind::Pairs),
+                ("topic://pairs/?pair[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", TopicKind::Pairs),
             ];
             for &(topic_url, expected_kind) in topic_urls.iter() {
                 let url = Url::parse(topic_url)?;
@@ -608,6 +702,71 @@ mod parse_and_format {
 
             Ok(())
         }
+
+        #[test]
+        fn pairs_one_test() -> anyhow::Result<()> {
+            let topic_data = Topic::parse_str("topic://pairs/amount_asset/price_asset")?.data();
+            let pairs = topic_data
+                .as_pairs()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+
+            assert_eq!(pairs[0].amount_asset, "amount_asset");
+            assert_eq!(pairs[0].price_asset, "price_asset");
+
+            Ok(())
+        }
+
+        #[test]
+        fn pairs_one_uri_only_test() -> anyhow::Result<()> {
+            let topic_data =
+                Topic::parse_str("topic://pairs/amount_asset/price_asset?pairs[]=skip/skip")?
+                    .data();
+            let pairs = topic_data
+                .as_pairs()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+
+            assert_eq!(pairs[0].amount_asset, "amount_asset");
+            assert_eq!(pairs[0].price_asset, "price_asset");
+
+            assert_eq!(pairs.len(), 1);
+
+            Ok(())
+        }
+
+        #[test]
+        fn pairs_many_test() -> anyhow::Result<()> {
+            let topic_data = Topic::parse_str("topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1")?.data();
+            let pairs = topic_data
+                .as_pairs()
+                .ok_or(anyhow::anyhow!("bad test case"))?;
+
+            assert_eq!(pairs[0].amount_asset, "amount_asset");
+            assert_eq!(pairs[0].price_asset, "price_asset");
+
+            assert_eq!(pairs[1].amount_asset, "amount_asset1");
+            assert_eq!(pairs[1].price_asset, "price_asset1");
+
+            Ok(())
+        }
+
+        #[test]
+        fn pairs_one_error_test() -> anyhow::Result<()> {
+            let topic_data = Topic::parse_str("topic://pairs/amount_asset");
+
+            assert!(topic_data.is_err());
+
+            Ok(())
+        }
+
+        #[test]
+        fn pairs_many_error_test() -> anyhow::Result<()> {
+            let topic_data =
+                Topic::parse_str("?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1");
+
+            assert!(topic_data.is_err());
+
+            Ok(())
+        }
     }
 
     mod format {
@@ -700,6 +859,25 @@ mod parse_and_format {
                     TopicData::LeasingBalance(lb) => {
                         result.push_str("leasing_balance/");
                         result.push_str(lb.address.as_str());
+                    }
+                    TopicData::Pairs(pairs) => {
+                        result.push_str("pairs");
+                        if pairs.len() == 1 {
+                            result.push_str(&format!(
+                                "/{}/{}",
+                                pairs[0].amount_asset, pairs[0].price_asset
+                            ));
+                        } else {
+                            result.push_str("/?pairs[]=");
+
+                            let pairs = pairs
+                                .iter()
+                                .map(|p| format!("{}/{}", p.amount_asset, p.price_asset))
+                                .collect::<Vec<String>>()
+                                .join("&pairs[]=");
+
+                            result.push_str(&pairs);
+                        }
                     }
                 }
                 result
@@ -817,6 +995,8 @@ mod parse_and_format {
                 "topic://transactions?type=all&address=some_address",
                 "topic://transactions?type=exchange&amount_asset=foo&price_asset=bar",
                 "topic://leasing_balance/some_address",
+                "topic://pairs/amount_asset/price_asset",
+                "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
             ];
             for s in urls {
                 let topic = Topic::parse_str(s)?;
@@ -838,6 +1018,9 @@ mod parse_and_format {
                 ("topic://transactions?type=all&address=some_address", false),
                 ("topic://transactions?type=exchange&amount_asset=a&price_asset=p", false),
                 ("topic://leasing_balance/some_address", false),
+                ("topic://pairs/amount_asset/price_asset", false),
+                ("topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", false),
+
             ];
             for (topic_url, expected_result) in test_cases {
                 let topic = Topic::parse_str(topic_url)?;
@@ -938,6 +1121,13 @@ impl TopicData {
     pub fn as_leasing_balance(&self) -> Option<&LeasingBalance> {
         match self {
             TopicData::LeasingBalance(leasing_balance) => Some(leasing_balance),
+            _ => None,
+        }
+    }
+
+    pub fn as_pairs(&self) -> Option<&Vec<ExchangePairs>> {
+        match self {
+            TopicData::Pairs(pairs) => Some(&pairs),
             _ => None,
         }
     }
