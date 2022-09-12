@@ -555,7 +555,7 @@ mod parse_and_format {
                 ("topic://transactions?type=exchange&amount_asset=foo&price_asset=bar", TopicKind::Transaction),
                 ("topic://leasing_balance/some_address", TopicKind::LeasingBalance),
                 ("topic://pairs/amount_asset/price_asset", TopicKind::Pairs),
-                ("topic://pairs/?pair[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", TopicKind::Pairs),
+                ("topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", TopicKind::Pairs),
             ];
             for &(topic_url, expected_kind) in topic_urls.iter() {
                 let url = Url::parse(topic_url)?;
