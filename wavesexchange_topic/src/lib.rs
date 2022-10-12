@@ -126,7 +126,7 @@ pub struct ExchangePair {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ExchangePairs {
-    pub pairs: Vec<ExchangePair>,
+    pairs: Vec<ExchangePair>,
 }
 
 mod parse_and_format {
@@ -388,17 +388,17 @@ mod parse_and_format {
                                     return Err(TopicParseError::InvalidExchangePairs);
                                 }
                             }
-                            (None, _) | (Some(""), _) => {
-                                // "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1"
-                                return Self::extract_pairs_from_get_params(pairs_in_get_params);
-                            }
-                            (Some(_), None) => return Err(TopicParseError::InvalidExchangePairs),
+                            _ => return Err(TopicParseError::InvalidExchangePairs),
                         }
                     }
                     None => {
                         // "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1"
                         return Self::extract_pairs_from_get_params(pairs_in_get_params);
                     }
+                }
+
+                if pairs.len() < 1 {
+                    return Err(TopicParseError::InvalidExchangePairs);
                 }
 
                 Ok(ExchangePairs { pairs })
@@ -750,26 +750,6 @@ mod parse_and_format {
         #[test]
         fn pairs_many_test() -> anyhow::Result<()> {
             let topic_data = Topic::parse_str(
-                "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
-            )?
-            .data();
-            let pairs = topic_data
-                .as_pairs()
-                .ok_or(anyhow::anyhow!("bad test case"))?;
-
-            assert_eq!(pairs.pairs[0].amount_asset, "amount_asset");
-            assert_eq!(pairs.pairs[0].price_asset, "price_asset");
-
-            assert_eq!(pairs.pairs[1].amount_asset, "amount_asset1");
-            assert_eq!(pairs.pairs[1].price_asset, "price_asset1");
-            assert_eq!(pairs.pairs.len(), 2);
-
-            Ok(())
-        }
-
-        #[test]
-        fn pairs_many_test_no_parts() -> anyhow::Result<()> {
-            let topic_data = Topic::parse_str(
                 "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
             )?
             .data();
@@ -817,7 +797,7 @@ mod parse_and_format {
         #[test]
         fn pairs_many_error_test() -> anyhow::Result<()> {
             let topic_data = Topic::parse_str(
-                "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1",
+                "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1",
             );
 
             assert!(topic_data.is_err());
@@ -925,7 +905,7 @@ mod parse_and_format {
                                 pairs.pairs[0].amount_asset, pairs.pairs[0].price_asset
                             ));
                         } else {
-                            result.push_str("/?pairs[]=");
+                            result.push_str("?pairs[]=");
 
                             let pairs = pairs
                                 .pairs
@@ -1054,7 +1034,7 @@ mod parse_and_format {
                 "topic://transactions?type=exchange&amount_asset=foo&price_asset=bar",
                 "topic://leasing_balance/some_address",
                 "topic://pairs/amount_asset/price_asset",
-                "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
+                "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
             ];
             for s in urls {
                 let topic = Topic::parse_str(s)?;
@@ -1218,7 +1198,7 @@ fn test_eq_and_hash() -> anyhow::Result<()> {
         "topic://leasing_balance/some_address",
         "topic://pairs/amount_asset/price_asset",
         "topic://pairs?pairs[]=amount_asset/price_asset",
-        "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
+        "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
     ];
     for topic_url in topic_urls {
         let topic1 = Topic::parse_str(topic_url)?;
