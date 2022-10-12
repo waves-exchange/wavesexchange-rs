@@ -1,6 +1,7 @@
 //! Subscription topic: an URI which can be parsed
 //! into a machine-readable data struct describing client's subscription.
 
+use serde::Deserialize;
 use std::sync::Arc;
 use url::Url;
 
@@ -129,13 +130,29 @@ pub struct ExchangePairs {
     pairs: Vec<ExchangePair>,
 }
 
+trait QSGetable {
+    fn from_qs_data(self) -> Vec<String>;
+}
+
+#[derive(Debug, Deserialize)]
+struct PairsQSData {
+    pairs: Vec<String>,
+}
+
+impl QSGetable for PairsQSData {
+    fn from_qs_data(self) -> Vec<String> {
+        self.pairs
+    }
+}
+
 mod parse_and_format {
     pub(super) mod parse {
+        use serde::Deserialize;
         use std::{borrow::Cow, sync::Arc};
         use thiserror::Error;
         use url::Url;
 
-        use crate::{ExchangePair, ExchangePairs};
+        use crate::{ExchangePair, ExchangePairs, PairsQSData, QSGetable};
 
         use super::super::{
             BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateSingle,
@@ -368,7 +385,9 @@ mod parse_and_format {
                 url: &Url,
             ) -> Result<ExchangePairs, TopicParseError> {
                 let mut pairs = vec![];
-                let pairs_in_get_params = query_get_vec(url, "pairs");
+
+                let pairs_in_get_params = query_get_vec::<PairsQSData>(url);
+
                 let segments = url.path_segments();
 
                 match segments {
@@ -508,26 +527,28 @@ mod parse_and_format {
             })
         }
 
-        fn query_get_vec<'a>(url: &'a Url, key: &str) -> Option<Vec<Cow<'a, str>>> {
-            let mut vals = vec![];
-
-            for (k, v) in url.query_pairs().into_iter() {
-                let k = k
-                    .replace("%5B", "")
-                    .replace("%5D", "")
-                    .replace("[", "")
-                    .replace("]", "");
-
-                if k == key && !(v).is_empty() {
-                    vals.push(v);
+        fn query_get_vec<'a, T: Deserialize<'a> + QSGetable>(
+            url: &'a Url,
+        ) -> Option<Vec<Cow<'a, str>>> {
+            let query_pairs: Vec<Cow<str>> = if let Some(q) = url.query() {
+                match serde_qs::from_str::<T>(q) {
+                    Ok(qq) => qq
+                        .from_qs_data()
+                        .iter()
+                        .cloned()
+                        .map(|i| i.into())
+                        .collect(),
+                    _ => return None,
                 }
-            }
+            } else {
+                return None;
+            };
 
-            if vals.is_empty() {
+            if query_pairs.is_empty() {
                 return None;
             }
 
-            Some(vals)
+            Some(query_pairs)
         }
 
         impl TopicKind {
@@ -586,6 +607,7 @@ mod parse_and_format {
                 ("topic://leasing_balance/some_address", TopicKind::LeasingBalance),
                 ("topic://pairs/amount_asset/price_asset", TopicKind::Pairs),
                 ("topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", TopicKind::Pairs),
+                ("topic://pairs?pairs[0]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1", TopicKind::Pairs),
             ];
             for &(topic_url, expected_kind) in topic_urls.iter() {
                 let url = Url::parse(topic_url)?;
@@ -749,20 +771,25 @@ mod parse_and_format {
 
         #[test]
         fn pairs_many_test() -> anyhow::Result<()> {
-            let topic_data = Topic::parse_str(
+            let valid_urls = [
                 "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
-            )?
-            .data();
-            let pairs = topic_data
-                .as_pairs()
-                .ok_or(anyhow::anyhow!("bad test case"))?;
+                "topic://pairs?pairs[0]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1"
+            ];
 
-            assert_eq!(pairs.pairs[0].amount_asset, "amount_asset");
-            assert_eq!(pairs.pairs[0].price_asset, "price_asset");
+            for u in valid_urls {
+                let topic_data = Topic::parse_str(u)?.data();
 
-            assert_eq!(pairs.pairs[1].amount_asset, "amount_asset1");
-            assert_eq!(pairs.pairs[1].price_asset, "price_asset1");
-            assert_eq!(pairs.pairs.len(), 2);
+                let pairs = topic_data
+                    .as_pairs()
+                    .ok_or(anyhow::anyhow!("bad test case"))?;
+
+                assert_eq!(pairs.pairs[0].amount_asset, "amount_asset");
+                assert_eq!(pairs.pairs[0].price_asset, "price_asset");
+
+                assert_eq!(pairs.pairs[1].amount_asset, "amount_asset1");
+                assert_eq!(pairs.pairs[1].price_asset, "price_asset1");
+                assert_eq!(pairs.pairs.len(), 2);
+            }
 
             Ok(())
         }
@@ -771,10 +798,12 @@ mod parse_and_format {
         fn pairs_error_test() -> anyhow::Result<()> {
             let err_urls = [
                 "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1",
-                "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1",
+                "topic://pairs/?pairs[]=amount_asset/price_asset",
                 "topic://pairs/amount_asset",
+                "topic://pairs?pairs[]=amount_asset1",
                 "topic://pairs/amount_asset/price_asset?pairs[]=skip/skip",
                 "topic://pairs/amount_asset/price_asset/err",
+                "topic://pairs?pairs[]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1"
             ];
 
             for url in err_urls {
