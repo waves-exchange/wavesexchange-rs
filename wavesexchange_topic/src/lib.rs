@@ -768,39 +768,18 @@ mod parse_and_format {
         }
 
         #[test]
-        fn pairs_one_test_error() -> anyhow::Result<()> {
-            let topic_data = Topic::parse_str("topic://pairs/amount_asset/price_asset/err");
-            assert!(topic_data.is_err());
-
-            Ok(())
-        }
-
-        #[test]
-        fn pairs_in_query_and_get_params_error() -> anyhow::Result<()> {
-            let topic_data =
-                Topic::parse_str("topic://pairs/amount_asset/price_asset?pairs[]=skip/skip");
-
-            assert!(topic_data.is_err());
-
-            Ok(())
-        }
-
-        #[test]
-        fn pairs_one_error_test() -> anyhow::Result<()> {
-            let topic_data = Topic::parse_str("topic://pairs/amount_asset");
-
-            assert!(topic_data.is_err());
-
-            Ok(())
-        }
-
-        #[test]
-        fn pairs_many_error_test() -> anyhow::Result<()> {
-            let topic_data = Topic::parse_str(
+        fn pairs_error_test() -> anyhow::Result<()> {
+            let err_urls = [
                 "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1",
-            );
+                "topic://pairs/?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1",
+                "topic://pairs/amount_asset",
+                "topic://pairs/amount_asset/price_asset?pairs[]=skip/skip",
+                "topic://pairs/amount_asset/price_asset/err",
+            ];
 
-            assert!(topic_data.is_err());
+            for url in err_urls {
+                assert!(Topic::parse_str(url).is_err());
+            }
 
             Ok(())
         }
