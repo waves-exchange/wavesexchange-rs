@@ -153,7 +153,7 @@ impl MetricsWarpBuilder {
     ///
     /// Note: if running in a metrics-only variant, `port` argument will be used for metrics instance,
     /// otherwise it will be used by main instance,
-    /// and metrics will have `port + metrics_PORT_OFFSET` port
+    /// and metrics will have `port + METRICS_PORT_OFFSET` port
     /// (or custom if was set explicitly with `with_metrics_port`)
     pub async fn run_blocking(mut self, port: u16) {
         self = self
