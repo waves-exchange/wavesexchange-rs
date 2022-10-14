@@ -18,7 +18,7 @@ lazy_static! {
     .unwrap();
 }
 
-pub const STATS_PORT_OFFSET: u16 = 1010;
+pub const METRICS_PORT_OFFSET: u16 = 1010;
 
 pub trait SharedFilter<R, E: Into<Rejection> = Rejection>:
     Filter<Extract = (R,), Error = E> + Clone + Shared
@@ -46,7 +46,7 @@ async fn metrics_handler(reg: Registry) -> impl Reply {
 type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 
 /// A warp wrapper that provides liveness endpoints (`livez/startz/readyz`)
-/// and extensible metrics collection for gathering requests (or any) stats.
+/// and extensible metrics collection for gathering requests (or any) statistics.
 /// Creates 1 or 2 warp instances.
 ///
 /// The first instance serves `GET /metrics` route and
@@ -59,29 +59,29 @@ type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 /// ```rust
 /// let routes = warp::path!("hello").and(warp::get());
 ///
-/// // run only stats instance on port 8080
-/// StatsWarpBuilder::new().run_blocking(8080).await;
+/// // run only metrics instance on port 8080
+/// MetricsWarpBuilder::new().run_blocking(8080).await;
 ///
-/// // run two warp instances on ports 8080 (main routes) and 9090 (stats routes)
-/// // (default port for stats is main_routes_port + 1010),
-/// // stats port can be overriden via `with_stats_port`
-/// StatsWarpBuilder::new().with_main_routes(routes).run_blocking(8080).await;
+/// // run two warp instances on ports 8080 (main routes) and 9090 (metrics routes)
+/// // (default port for metrics is main_routes_port + 1010),
+/// // metrics port can be overriden via `with_metrics_port`
+/// MetricsWarpBuilder::new().with_main_routes(routes).run_blocking(8080).await;
 /// ```
-pub struct StatsWarpBuilder {
+pub struct MetricsWarpBuilder {
     registry: Registry,
     main_routes: Option<DeepBoxedFilter>,
-    stats_port: Option<u16>,
+    metrics_port: Option<u16>,
     livez: DeepBoxedFilter<LivenessReply>,
     readyz: DeepBoxedFilter<LivenessReply>,
     startz: DeepBoxedFilter<LivenessReply>,
 }
 
-impl StatsWarpBuilder {
-    /// Create and init builder with stats warp routes
+impl MetricsWarpBuilder {
+    /// Create and init builder with metrics and liveness routes
     pub fn new() -> Self {
         Self {
             main_routes: None,
-            stats_port: None,
+            metrics_port: None,
             registry: Registry::new(),
             livez: livez_fn().boxed(),
             readyz: readyz_fn().boxed(),
@@ -102,9 +102,9 @@ impl StatsWarpBuilder {
         self
     }
 
-    /// Define custom port of stats instance.
-    pub fn with_stats_port(mut self, port: u16) -> Self {
-        self.stats_port = Some(port);
+    /// Define custom port of metrics instance.
+    pub fn with_metrics_port(mut self, port: u16) -> Self {
+        self.metrics_port = Some(port);
         self
     }
 
@@ -151,10 +151,10 @@ impl StatsWarpBuilder {
 
     /// Run warp instance(s) on current thread.
     ///
-    /// Note: if running in a stats-only variant, `port` argument will be used for stats instance,
+    /// Note: if running in a metrics-only variant, `port` argument will be used for metrics instance,
     /// otherwise it will be used by main instance,
-    /// and stats will have `port + STATS_PORT_OFFSET` port
-    /// (or custom if was set explicitly with `with_stats_port`)
+    /// and metrics will have `port + metrics_PORT_OFFSET` port
+    /// (or custom if was set explicitly with `with_metrics_port`)
     pub async fn run_blocking(mut self, port: u16) {
         self = self
             .with_metric(&*REQUESTS)
@@ -162,7 +162,7 @@ impl StatsWarpBuilder {
 
         let Self {
             main_routes,
-            stats_port,
+            metrics_port,
             registry,
             livez,
             readyz,
@@ -170,8 +170,8 @@ impl StatsWarpBuilder {
         } = self;
 
         let host = [0, 0, 0, 0];
-        let stats_port = stats_port.unwrap_or(if main_routes.is_some() {
-            port + STATS_PORT_OFFSET
+        let metrics_port = metrics_port.unwrap_or(if main_routes.is_some() {
+            port + METRICS_PORT_OFFSET
         } else {
             port
         });
@@ -179,18 +179,18 @@ impl StatsWarpBuilder {
             .and(warp::get())
             .and(warp::any().map(move || registry.clone()))
             .then(metrics_handler);
-        let warp_stats_instance =
-            warp::serve(metrics_filter.or(livez).or(readyz).or(startz)).run((host, stats_port));
+        let warp_metrics_instance =
+            warp::serve(metrics_filter.or(livez).or(readyz).or(startz)).run((host, metrics_port));
 
         match main_routes {
             Some(routes) => {
                 join(
                     warp::serve(routes.with(warp::log::custom(estimate_request))).run((host, port)),
-                    warp_stats_instance,
+                    warp_metrics_instance,
                 )
                 .await;
             }
-            None => warp_stats_instance.await,
+            None => warp_metrics_instance.await,
         }
     }
 }
