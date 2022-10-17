@@ -18,7 +18,8 @@ lazy_static! {
     .unwrap();
 }
 
-pub const METRICS_PORT_OFFSET: u16 = 1010;
+pub const DEFAULT_MAIN_ROUTES_PORT: u16 = 8080;
+pub const DEFAULT_METRICS_PORT_OFFSET: u16 = 1010;
 
 pub trait SharedFilter<R, E: Into<Rejection> = Rejection>:
     Filter<Extract = (R,), Error = E> + Clone + Shared
@@ -60,16 +61,17 @@ type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 /// let routes = warp::path!("hello").and(warp::get());
 ///
 /// // run only metrics instance on port 8080
-/// MetricsWarpBuilder::new().run_blocking(8080).await;
+/// MetricsWarpBuilder::new().with_metrics_port(8080).run_blocking().await;
 ///
 /// // run two warp instances on ports 8080 (main routes) and 9090 (metrics routes)
 /// // (default port for metrics is main_routes_port + 1010),
 /// // metrics port can be overriden via `with_metrics_port`
-/// MetricsWarpBuilder::new().with_main_routes(routes).run_blocking(8080).await;
+/// MetricsWarpBuilder::new().with_main_routes(routes).with_main_routes_port(8080).run_blocking().await;
 /// ```
 pub struct MetricsWarpBuilder {
     registry: Registry,
     main_routes: Option<DeepBoxedFilter>,
+    main_routes_port: Option<u16>,
     metrics_port: Option<u16>,
     livez: DeepBoxedFilter<LivenessReply>,
     readyz: DeepBoxedFilter<LivenessReply>,
@@ -81,6 +83,7 @@ impl MetricsWarpBuilder {
     pub fn new() -> Self {
         Self {
             main_routes: None,
+            main_routes_port: None,
             metrics_port: None,
             registry: Registry::new(),
             livez: livez_fn().boxed(),
@@ -99,6 +102,12 @@ impl MetricsWarpBuilder {
         F: SharedFilter<R, E>,
     {
         self.main_routes = Some(deep_box_filter(routes));
+        self
+    }
+
+    /// Define custom port of main instance.
+    pub fn with_main_routes_port(mut self, port: u16) -> Self {
+        self.main_routes_port = Some(port);
         self
     }
 
@@ -141,7 +150,7 @@ impl MetricsWarpBuilder {
     /// Register prometheus metric. No need to `Box::new`.
     ///
     /// Note: if metric is created by `lazy_static!` or analogues, deref it first:
-    /// ```rust
+    /// ```rust,no_run
     /// .with_metric(&*MY_STATIC_METRIC)
     /// ```
     pub fn with_metric<M: Collector + Clone + 'static>(self, metric: &M) -> Self {
@@ -149,19 +158,15 @@ impl MetricsWarpBuilder {
         self
     }
 
-    /// Run warp instance(s) on current thread.
-    ///
-    /// Note: if running in a metrics-only variant, `port` argument will be used for metrics instance,
-    /// otherwise it will be used by main instance,
-    /// and metrics will have `port + METRICS_PORT_OFFSET` port
-    /// (or custom if was set explicitly with `with_metrics_port`)
-    pub async fn run_blocking(mut self, port: u16) {
+    /// Run warp instance(s) on current thread
+    pub async fn run_blocking(mut self) {
         self = self
             .with_metric(&*REQUESTS)
             .with_metric(&*RESPONSE_DURATION);
 
         let Self {
             main_routes,
+            main_routes_port,
             metrics_port,
             registry,
             livez,
@@ -170,11 +175,8 @@ impl MetricsWarpBuilder {
         } = self;
 
         let host = [0, 0, 0, 0];
-        let metrics_port = metrics_port.unwrap_or(if main_routes.is_some() {
-            port + METRICS_PORT_OFFSET
-        } else {
-            port
-        });
+        let main_routes_port = main_routes_port.unwrap_or(DEFAULT_MAIN_ROUTES_PORT);
+        let metrics_port = metrics_port.unwrap_or(main_routes_port + DEFAULT_METRICS_PORT_OFFSET);
         let metrics_filter = warp::path!("metrics")
             .and(warp::get())
             .and(warp::any().map(move || registry.clone()))
@@ -185,7 +187,8 @@ impl MetricsWarpBuilder {
         match main_routes {
             Some(routes) => {
                 join(
-                    warp::serve(routes.with(warp::log::custom(estimate_request))).run((host, port)),
+                    warp::serve(routes.with(warp::log::custom(estimate_request)))
+                        .run((host, main_routes_port)),
                     warp_metrics_instance,
                 )
                 .await;

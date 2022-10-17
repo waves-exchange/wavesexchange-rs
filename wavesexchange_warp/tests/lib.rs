@@ -7,9 +7,9 @@ use wavesexchange_warp::MetricsWarpBuilder;
 
 #[tokio::test]
 async fn test_run_metrics_warp() {
-    let port = 8080;
+    let main_port = 8081;
     let metrics_port = 9001;
-    let url = format!("http://0.0.0.0:{port}");
+    let url = format!("http://0.0.0.0:{main_port}");
     let metrics_url = format!("http://0.0.0.0:{}", metrics_port);
     let routes = warp::path!("hello").and_then(|| async { Ok::<_, Infallible>("Hello, world!") });
 
@@ -17,7 +17,8 @@ async fn test_run_metrics_warp() {
         .with_main_routes(routes)
         .with_startz_checker(|| async { Err("still not enough racoons") })
         .with_metrics_port(metrics_port)
-        .run_blocking(port);
+        .with_main_routes_port(main_port)
+        .run_blocking();
 
     spawn(warps);
     time::sleep(Duration::from_secs(1)).await; // wait for server
@@ -49,7 +50,7 @@ async fn test_run_metrics_warp() {
         .unwrap();
     println!("{metrics}");
 
-    // requests to metrics_url don't count
+    // don't count requests to metrics_url
     assert!(metrics.contains("incoming_requests 2"));
     assert!(metrics.contains(r#"response_duration_count{code="200",method="GET"} 1"#));
     assert!(metrics.contains(r#"response_duration_count{code="404",method="GET"} 1"#));
