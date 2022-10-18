@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use crate::{ApiResult, BaseApi, HttpClient};
 use std::fmt::Debug;
 
@@ -20,12 +18,10 @@ impl HttpClient<RatesService> {
 
         let mut rates = vec![];
 
-        for w_pairs in &pairs.into_iter().chunks(100) {
-            chunk_pairs = w_pairs.collect();
-
-            dbg!(&chunk_pairs);
-
-            let body = dto::RatesRequest { pairs: chunk_pairs };
+        for chunk_pairs in pairs.chunks(100) {
+            let body = dto::RatesRequest {
+                pairs: chunk_pairs.to_vec(),
+            };
             let mut req: dto::RatesResponse = self
                 .create_req_handler(self.http_post("rates").json(&body), "rates::rates")
                 .execute()
