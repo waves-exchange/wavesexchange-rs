@@ -3,6 +3,7 @@ use super::{
     livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz,
 };
 use futures::future::join;
+use futures::future::BoxFuture;
 use lazy_static::lazy_static;
 use prometheus::{core::Collector, HistogramOpts, HistogramVec, IntCounter, Registry, TextEncoder};
 use std::{fmt::Debug, future::Future};
@@ -76,6 +77,7 @@ pub struct MetricsWarpBuilder {
     livez: DeepBoxedFilter<LivenessReply>,
     readyz: DeepBoxedFilter<LivenessReply>,
     startz: DeepBoxedFilter<LivenessReply>,
+    graceful_shutdown_signal: Option<BoxFuture<'static, ()>>,
 }
 
 impl MetricsWarpBuilder {
@@ -89,6 +91,7 @@ impl MetricsWarpBuilder {
             livez: livez_fn().boxed(),
             readyz: readyz_fn().boxed(),
             startz: startz_fn().boxed(),
+            graceful_shutdown_signal: None,
         }
     }
 
@@ -158,6 +161,14 @@ impl MetricsWarpBuilder {
         self
     }
 
+    pub fn with_graceful_shutdown<F>(mut self, signal: F) -> Self
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.graceful_shutdown_signal = Some(Box::pin(signal));
+        self
+    }
+
     /// Run warp instance(s) on current thread
     pub async fn run_blocking(mut self) {
         self = self
@@ -172,6 +183,7 @@ impl MetricsWarpBuilder {
             livez,
             readyz,
             startz,
+            graceful_shutdown_signal,
         } = self;
 
         let host = [0, 0, 0, 0];
@@ -186,12 +198,20 @@ impl MetricsWarpBuilder {
 
         match main_routes {
             Some(routes) => {
-                join(
-                    warp::serve(routes.with(warp::log::custom(estimate_request)))
-                        .run((host, main_routes_port)),
-                    warp_metrics_instance,
-                )
-                .await;
+                let warp_main_instance_prepared =
+                    warp::serve(routes.with(warp::log::custom(estimate_request)));
+                match graceful_shutdown_signal {
+                    Some(signal) => {
+                        let (_addr, warp_main_instance) = warp_main_instance_prepared
+                            .bind_with_graceful_shutdown((host, main_routes_port), signal);
+                        join(warp_main_instance, warp_metrics_instance).await;
+                    }
+                    None => {
+                        let warp_main_instance =
+                            warp_main_instance_prepared.run((host, main_routes_port));
+                        join(warp_main_instance, warp_metrics_instance).await;
+                    }
+                }
             }
             None => warp_metrics_instance.await,
         }
