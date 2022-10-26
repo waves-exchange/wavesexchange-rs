@@ -22,12 +22,12 @@ impl HttpClient<RatesService> {
             let body = dto::RatesRequest {
                 pairs: chunk_pairs.to_vec(),
             };
-            let mut req: dto::RatesResponse = self
+            let mut resp: dto::RatesResponse = self
                 .create_req_handler(self.http_post("rates").json(&body), "rates::rates")
                 .execute()
                 .await?;
 
-            rates.append(&mut req.data);
+            rates.append(&mut resp.data);
         }
 
         Ok(dto::RatesResponse { data: rates })
