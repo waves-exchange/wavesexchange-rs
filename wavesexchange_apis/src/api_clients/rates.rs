@@ -16,11 +16,21 @@ impl HttpClient<RatesService> {
             .map(|(a, b)| format!("{}/{}", a.into(), b.into()))
             .collect::<Vec<_>>();
 
-        let body = dto::RatesRequest { pairs };
+        let mut rates = vec![];
 
-        self.create_req_handler(self.http_post("rates").json(&body), "rates::rates")
-            .execute()
-            .await
+        for chunk_pairs in pairs.chunks(100) {
+            let body = dto::RatesRequest {
+                pairs: chunk_pairs.to_vec(),
+            };
+            let mut resp: dto::RatesResponse = self
+                .create_req_handler(self.http_post("rates").json(&body), "rates::rates")
+                .execute()
+                .await?;
+
+            rates.append(&mut resp.data);
+        }
+
+        Ok(dto::RatesResponse { data: rates })
     }
 }
 
