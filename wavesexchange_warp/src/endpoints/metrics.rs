@@ -2,8 +2,7 @@ use super::{
     liveness::{LivenessReply, Shared},
     livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz,
 };
-use futures::future::join;
-use futures::future::BoxFuture;
+use futures::future::{join, BoxFuture, FutureExt};
 use lazy_static::lazy_static;
 use prometheus::{core::Collector, HistogramOpts, HistogramVec, IntCounter, Registry, TextEncoder};
 use std::{fmt::Debug, future::Future};
@@ -39,6 +38,11 @@ fn estimate_request(info: Info) {
     RESPONSE_DURATION
         .with_label_values(&[info.status().as_str(), info.method().as_str()])
         .observe(info.elapsed().as_secs_f64());
+}
+
+pub fn reset_metrics() {
+    REQUESTS.reset();
+    RESPONSE_DURATION.reset();
 }
 
 async fn metrics_handler(reg: Registry) -> impl Reply {
@@ -170,7 +174,7 @@ impl MetricsWarpBuilder {
     }
 
     /// Run warp instance(s) on current thread
-    pub async fn run_blocking(mut self) {
+    pub async fn run_async(mut self) {
         self = self
             .with_metric(&*REQUESTS)
             .with_metric(&*RESPONSE_DURATION);
@@ -193,27 +197,48 @@ impl MetricsWarpBuilder {
             .and(warp::get())
             .and(warp::any().map(move || registry.clone()))
             .then(metrics_handler);
-        let warp_metrics_instance =
-            warp::serve(metrics_filter.or(livez).or(readyz).or(startz)).run((host, metrics_port));
+
+        let warp_metrics_instance_prepared =
+            warp::serve(metrics_filter.or(livez).or(readyz).or(startz));
 
         match main_routes {
             Some(routes) => {
                 let warp_main_instance_prepared =
                     warp::serve(routes.with(warp::log::custom(estimate_request)));
+
                 match graceful_shutdown_signal {
                     Some(signal) => {
+                        let shared_signal = signal.shared();
                         let (_addr, warp_main_instance) = warp_main_instance_prepared
-                            .bind_with_graceful_shutdown((host, main_routes_port), signal);
+                            .bind_with_graceful_shutdown(
+                                (host, main_routes_port),
+                                shared_signal.clone(),
+                            );
+                        let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
+                            .bind_with_graceful_shutdown((host, metrics_port), shared_signal);
                         join(warp_main_instance, warp_metrics_instance).await;
                     }
                     None => {
                         let warp_main_instance =
                             warp_main_instance_prepared.run((host, main_routes_port));
+                        let warp_metrics_instance =
+                            warp_metrics_instance_prepared.run((host, metrics_port));
                         join(warp_main_instance, warp_metrics_instance).await;
                     }
                 }
             }
-            None => warp_metrics_instance.await,
+            None => match graceful_shutdown_signal {
+                Some(signal) => {
+                    let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
+                        .bind_with_graceful_shutdown((host, metrics_port), signal);
+                    warp_metrics_instance.await;
+                }
+                None => {
+                    warp_metrics_instance_prepared
+                        .run((host, metrics_port))
+                        .await
+                }
+            },
         }
     }
 }

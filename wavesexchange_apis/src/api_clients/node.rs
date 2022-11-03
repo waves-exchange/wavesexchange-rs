@@ -101,7 +101,7 @@ impl HttpClient<Node> {
         cursor: Option<String>,
     ) -> ApiResult<Vec<dto::StateChangesResponse>> {
         let url = format!(
-            "debug/stateChanges/address/{}/limit/{limit}{}",
+            "debug/stateChanges/address/{}/limit/{limit}{query_string}",
             address.as_ref(),
             query_string = match &cursor {
                 None => String::from(""),
