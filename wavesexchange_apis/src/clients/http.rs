@@ -83,7 +83,7 @@ impl<A: BaseApi> HttpClient<A> {
         Ok(resp)
     }
 
-    pub(crate) fn create_req_handler<T: DeserializeOwned>(
+    pub fn create_req_handler<T: DeserializeOwned>(
         &self,
         req: RequestBuilder,
         req_info: impl Into<String> + Clone + Send,
@@ -160,7 +160,7 @@ type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult
 ///     )
 ///     .execute()
 /// ```
-pub(crate) struct WXRequestHandler<'cli, A, T>
+pub struct WXRequestHandler<'cli, A, T>
 where
     A: BaseApi,
     T: DeserializeOwned,
