@@ -73,6 +73,7 @@ pub mod dto {
     pub struct Order {
         // only trade-related data so far
         pub sender: String,
+        pub amount: f64,
         pub order_type: OrderType,
         pub asset_pair: AssetPair,
     }
