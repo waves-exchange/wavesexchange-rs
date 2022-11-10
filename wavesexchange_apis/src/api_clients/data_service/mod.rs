@@ -76,6 +76,7 @@ pub mod dto {
         pub amount: f64,
         pub order_type: OrderType,
         pub asset_pair: AssetPair,
+        pub timestamp: DateTime<Utc>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
