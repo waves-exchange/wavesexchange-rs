@@ -1,7 +1,6 @@
 //! Subscription topic: an URI which can be parsed
 //! into a machine-readable data struct describing client's subscription.
 
-use serde::Deserialize;
 use std::sync::Arc;
 use url::Url;
 
@@ -130,29 +129,13 @@ pub struct ExchangePairs {
     pairs: Vec<ExchangePair>,
 }
 
-trait QSGetable {
-    fn from_qs_data(self) -> Vec<String>;
-}
-
-#[derive(Debug, Deserialize)]
-struct PairsQSData {
-    pairs: Vec<String>,
-}
-
-impl QSGetable for PairsQSData {
-    fn from_qs_data(self) -> Vec<String> {
-        self.pairs
-    }
-}
-
 mod parse_and_format {
     pub(super) mod parse {
-        use serde::Deserialize;
         use std::{borrow::Cow, sync::Arc};
         use thiserror::Error;
         use url::Url;
 
-        use crate::{ExchangePair, ExchangePairs, PairsQSData, QSGetable};
+        use crate::{ExchangePair, ExchangePairs};
 
         use super::super::{
             BlockchainHeight, ConfigFile, ConfigResource, LeasingBalance, State, StateSingle,
@@ -347,15 +330,15 @@ mod parse_and_format {
             }
 
             fn extract_pairs_from_get_params(
-                pairs_in_get_params: Option<Vec<Cow<str>>>,
+                pairs_in_get_params: Result<Vec<String>, ()>,
             ) -> Result<ExchangePairs, TopicParseError> {
                 // topic://pairs?pairs[]=amount_asset_id/price_asset_id&pairs[]=amount_asset_id1/price_asset_id1
 
                 let mut pairs = vec![];
 
                 match pairs_in_get_params {
-                    None => return Err(TopicParseError::InvalidExchangePairs),
-                    Some(q_pair) => {
+                    Err(_) => return Err(TopicParseError::InvalidExchangePairs),
+                    Ok(q_pair) => {
                         for p in q_pair {
                             let pair = p.split("/").collect::<Vec<&str>>();
 
@@ -386,7 +369,8 @@ mod parse_and_format {
             ) -> Result<ExchangePairs, TopicParseError> {
                 let mut pairs = vec![];
 
-                let pairs_in_get_params = query_get_vec::<PairsQSData>(url);
+                let pairs_in_get_params =
+                    super::serde_pairs::pairs_query_decode(url.query().unwrap_or(""));
 
                 let segments = url.path_segments();
 
@@ -403,7 +387,7 @@ mod parse_and_format {
                                     }
                                 });
 
-                                if pairs_in_get_params.is_some() || parts.next().is_some() {
+                                if pairs_in_get_params.is_ok() || parts.next().is_some() {
                                     return Err(TopicParseError::InvalidExchangePairs);
                                 }
                             }
@@ -525,30 +509,6 @@ mod parse_and_format {
                     None
                 }
             })
-        }
-
-        fn query_get_vec<'a, T: Deserialize<'a> + QSGetable>(
-            url: &'a Url,
-        ) -> Option<Vec<Cow<'a, str>>> {
-            let query_pairs: Vec<Cow<str>> = if let Some(q) = url.query() {
-                match serde_qs::from_str::<T>(q) {
-                    Ok(qq) => qq
-                        .from_qs_data()
-                        .iter()
-                        .cloned()
-                        .map(|i| i.into())
-                        .collect(),
-                    _ => return None,
-                }
-            } else {
-                return None;
-            };
-
-            if query_pairs.is_empty() {
-                return None;
-            }
-
-            Some(query_pairs)
         }
 
         impl TopicKind {
@@ -772,8 +732,9 @@ mod parse_and_format {
         #[test]
         fn pairs_many_test() -> anyhow::Result<()> {
             let valid_urls = [
-                "topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1",
-                "topic://pairs?pairs[0]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1"
+                "topic://pairs?pairs[0]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1",
+                "topic://pairs?pairs[0]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1",
+                "topic://pairs?pairs[0]=amount_asset%2Fprice_asset&pairs[1]=amount_asset1%2Fprice_asset1"
             ];
 
             for u in valid_urls {
@@ -931,6 +892,20 @@ mod parse_and_format {
         }
     }
 
+    mod serde_pairs {
+        use serde::Deserialize;
+
+        #[derive(Debug, Deserialize)]
+        struct QSPairs {
+            pairs: Vec<String>,
+        }
+
+        pub(super) fn pairs_query_decode(s: &str) -> Result<Vec<String>, ()> {
+            let qs_pairs: QSPairs = serde_qs::from_str(s).map_err(|_| ())?;
+            Ok(qs_pairs.pairs)
+        }
+    }
+
     mod serde_state {
         use super::super::StateMultiPatterns;
         use serde::{Deserialize, Serialize};
@@ -1065,7 +1040,8 @@ mod parse_and_format {
                 ("topic://transactions?type=exchange&amount_asset=a&price_asset=p", false),
                 ("topic://leasing_balance/some_address", false),
                 ("topic://pairs/amount_asset/price_asset", false),
-                ("topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", false),
+                ("topic://pairs?pairs[]=amount_asset/price_asset", false),
+                ("topic://pairs?pairs[]=amount_asset/price_asset&pairs[]=amount_asset1/price_asset1", true),
 
             ];
             for (topic_url, expected_result) in test_cases {
@@ -1098,7 +1074,11 @@ impl Topic {
 
     /// Whether this topic can be expanded to a set of other topics.
     pub fn is_multi_topic(&self) -> bool {
-        self.kind() == TopicKind::State && self.topic_url.query().is_some()
+        match self.kind() {
+            TopicKind::State => self.topic_url.query().is_some(),
+            TopicKind::Pairs => self.data().is_multi_topic(),
+            _ => false,
+        }
     }
 
     pub fn data(&self) -> TopicData {
@@ -1111,6 +1091,7 @@ impl TopicData {
     pub fn is_multi_topic(&self) -> bool {
         match self {
             TopicData::State(State::MultiPatterns(_)) => true,
+            TopicData::Pairs(t) => t.pairs.len() > 1,
             _ => false,
         }
     }
