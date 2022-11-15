@@ -2,7 +2,7 @@ use super::{
     liveness::{LivenessReply, Shared},
     livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz,
 };
-use futures::future::join;
+use futures::future::{join, BoxFuture, FutureExt};
 use lazy_static::lazy_static;
 use prometheus::{core::Collector, HistogramOpts, HistogramVec, IntCounter, Registry, TextEncoder};
 use std::{fmt::Debug, future::Future};
@@ -18,7 +18,8 @@ lazy_static! {
     .unwrap();
 }
 
-pub const STATS_PORT_OFFSET: u16 = 1010;
+pub const DEFAULT_MAIN_ROUTES_PORT: u16 = 8080;
+pub const DEFAULT_METRICS_PORT_OFFSET: u16 = 1010;
 
 pub trait SharedFilter<R, E: Into<Rejection> = Rejection>:
     Filter<Extract = (R,), Error = E> + Clone + Shared
@@ -39,6 +40,11 @@ fn estimate_request(info: Info) {
         .observe(info.elapsed().as_secs_f64());
 }
 
+pub fn reset_metrics() {
+    REQUESTS.reset();
+    RESPONSE_DURATION.reset();
+}
+
 async fn metrics_handler(reg: Registry) -> impl Reply {
     TextEncoder::new().encode_to_string(&reg.gather()).unwrap()
 }
@@ -46,7 +52,7 @@ async fn metrics_handler(reg: Registry) -> impl Reply {
 type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 
 /// A warp wrapper that provides liveness endpoints (`livez/startz/readyz`)
-/// and extensible metrics collection for gathering requests (or any) stats.
+/// and extensible metrics collection for gathering requests (or any) statistics.
 /// Creates 1 or 2 warp instances.
 ///
 /// The first instance serves `GET /metrics` route and
@@ -59,33 +65,37 @@ type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 /// ```rust
 /// let routes = warp::path!("hello").and(warp::get());
 ///
-/// // run only stats instance on port 8080
-/// StatsWarpBuilder::new().run_blocking(8080).await;
+/// // run only metrics instance on port 8080
+/// MetricsWarpBuilder::new().with_metrics_port(8080).run_blocking().await;
 ///
-/// // run two warp instances on ports 8080 (main routes) and 9090 (stats routes)
-/// // (default port for stats is main_routes_port + 1010),
-/// // stats port can be overriden via `with_stats_port`
-/// StatsWarpBuilder::new().with_main_routes(routes).run_blocking(8080).await;
+/// // run two warp instances on ports 8080 (main routes) and 9090 (metrics routes)
+/// // (default port for metrics is main_routes_port + 1010),
+/// // metrics port can be overriden via `with_metrics_port`
+/// MetricsWarpBuilder::new().with_main_routes(routes).with_main_routes_port(8080).run_blocking().await;
 /// ```
-pub struct StatsWarpBuilder {
+pub struct MetricsWarpBuilder {
     registry: Registry,
     main_routes: Option<DeepBoxedFilter>,
-    stats_port: Option<u16>,
+    main_routes_port: Option<u16>,
+    metrics_port: Option<u16>,
     livez: DeepBoxedFilter<LivenessReply>,
     readyz: DeepBoxedFilter<LivenessReply>,
     startz: DeepBoxedFilter<LivenessReply>,
+    graceful_shutdown_signal: Option<BoxFuture<'static, ()>>,
 }
 
-impl StatsWarpBuilder {
-    /// Create and init builder with stats warp routes
+impl MetricsWarpBuilder {
+    /// Create and init builder with metrics and liveness routes
     pub fn new() -> Self {
         Self {
             main_routes: None,
-            stats_port: None,
+            main_routes_port: None,
+            metrics_port: None,
             registry: Registry::new(),
             livez: livez_fn().boxed(),
             readyz: readyz_fn().boxed(),
             startz: startz_fn().boxed(),
+            graceful_shutdown_signal: None,
         }
     }
 
@@ -102,9 +112,15 @@ impl StatsWarpBuilder {
         self
     }
 
-    /// Define custom port of stats instance.
-    pub fn with_stats_port(mut self, port: u16) -> Self {
-        self.stats_port = Some(port);
+    /// Define custom port of main instance.
+    pub fn with_main_routes_port(mut self, port: u16) -> Self {
+        self.main_routes_port = Some(port);
+        self
+    }
+
+    /// Define custom port of metrics instance.
+    pub fn with_metrics_port(mut self, port: u16) -> Self {
+        self.metrics_port = Some(port);
         self
     }
 
@@ -141,7 +157,7 @@ impl StatsWarpBuilder {
     /// Register prometheus metric. No need to `Box::new`.
     ///
     /// Note: if metric is created by `lazy_static!` or analogues, deref it first:
-    /// ```rust
+    /// ```rust,no_run
     /// .with_metric(&*MY_STATIC_METRIC)
     /// ```
     pub fn with_metric<M: Collector + Clone + 'static>(self, metric: &M) -> Self {
@@ -149,48 +165,80 @@ impl StatsWarpBuilder {
         self
     }
 
-    /// Run warp instance(s) on current thread.
-    ///
-    /// Note: if running in a stats-only variant, `port` argument will be used for stats instance,
-    /// otherwise it will be used by main instance,
-    /// and stats will have `port + STATS_PORT_OFFSET` port
-    /// (or custom if was set explicitly with `with_stats_port`)
-    pub async fn run_blocking(mut self, port: u16) {
+    pub fn with_graceful_shutdown<F>(mut self, signal: F) -> Self
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.graceful_shutdown_signal = Some(Box::pin(signal));
+        self
+    }
+
+    /// Run warp instance(s) on current thread
+    pub async fn run_async(mut self) {
         self = self
             .with_metric(&*REQUESTS)
             .with_metric(&*RESPONSE_DURATION);
 
         let Self {
             main_routes,
-            stats_port,
+            main_routes_port,
+            metrics_port,
             registry,
             livez,
             readyz,
             startz,
+            graceful_shutdown_signal,
         } = self;
 
         let host = [0, 0, 0, 0];
-        let stats_port = stats_port.unwrap_or(if main_routes.is_some() {
-            port + STATS_PORT_OFFSET
-        } else {
-            port
-        });
+        let main_routes_port = main_routes_port.unwrap_or(DEFAULT_MAIN_ROUTES_PORT);
+        let metrics_port = metrics_port.unwrap_or(main_routes_port + DEFAULT_METRICS_PORT_OFFSET);
         let metrics_filter = warp::path!("metrics")
             .and(warp::get())
             .and(warp::any().map(move || registry.clone()))
             .then(metrics_handler);
-        let warp_stats_instance =
-            warp::serve(metrics_filter.or(livez).or(readyz).or(startz)).run((host, stats_port));
+
+        let warp_metrics_instance_prepared =
+            warp::serve(metrics_filter.or(livez).or(readyz).or(startz));
 
         match main_routes {
             Some(routes) => {
-                join(
-                    warp::serve(routes.with(warp::log::custom(estimate_request))).run((host, port)),
-                    warp_stats_instance,
-                )
-                .await;
+                let warp_main_instance_prepared =
+                    warp::serve(routes.with(warp::log::custom(estimate_request)));
+
+                match graceful_shutdown_signal {
+                    Some(signal) => {
+                        let shared_signal = signal.shared();
+                        let (_addr, warp_main_instance) = warp_main_instance_prepared
+                            .bind_with_graceful_shutdown(
+                                (host, main_routes_port),
+                                shared_signal.clone(),
+                            );
+                        let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
+                            .bind_with_graceful_shutdown((host, metrics_port), shared_signal);
+                        join(warp_main_instance, warp_metrics_instance).await;
+                    }
+                    None => {
+                        let warp_main_instance =
+                            warp_main_instance_prepared.run((host, main_routes_port));
+                        let warp_metrics_instance =
+                            warp_metrics_instance_prepared.run((host, metrics_port));
+                        join(warp_main_instance, warp_metrics_instance).await;
+                    }
+                }
             }
-            None => warp_stats_instance.await,
+            None => match graceful_shutdown_signal {
+                Some(signal) => {
+                    let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
+                        .bind_with_graceful_shutdown((host, metrics_port), signal);
+                    warp_metrics_instance.await;
+                }
+                None => {
+                    warp_metrics_instance_prepared
+                        .run((host, metrics_port))
+                        .await
+                }
+            },
         }
     }
 }
