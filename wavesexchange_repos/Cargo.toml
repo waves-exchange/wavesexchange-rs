@@ -1,0 +1,14 @@
+[package]
+name = "wavesexchange_repos"
+version = "0.1.0"
+edition = "2021"
+authors = ["Artem Sidorenko <asidorenko@uniqsoft.ae>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.58"
+deadpool-diesel = "0.4.0"
+derive_builder = "0.11.2"
+diesel = { version = "2.0.2", features = ["postgres"] }
+thiserror = "1.0.37"
