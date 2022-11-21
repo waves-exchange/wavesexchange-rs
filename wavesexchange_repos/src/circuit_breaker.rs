@@ -26,8 +26,9 @@ pub struct CircuitBreaker<Repo: FallibleRepo> {
 }
 
 impl<Repo: FallibleRepo> CircuitBreakerBuilder<Repo> {
-    pub fn max_err_count_per_timespan(&mut self, ts: usize) {
-        self.max_err_count_per_timespan = NonZeroUsize::new(ts)
+    pub fn max_err_count_per_timespan(mut self, ts: usize) -> CircuitBreakerBuilder<Repo> {
+        self.max_err_count_per_timespan = NonZeroUsize::new(ts);
+        self
     }
 }
 
