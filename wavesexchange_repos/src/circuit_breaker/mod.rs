@@ -9,7 +9,10 @@ pub mod config;
 pub mod error;
 pub mod impls;
 
-use error::Error;
+pub use config::Config;
+pub use error::Error;
+pub use impls::*;
+
 use std::{
     future::Future,
     num::NonZeroUsize,

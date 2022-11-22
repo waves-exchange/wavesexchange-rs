@@ -2,8 +2,6 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use super::error::Error;
-
 fn default_max_timespan_ms() -> u64 {
     10000
 }
@@ -26,7 +24,7 @@ pub struct Config {
     pub max_err_count_per_timespan: usize,
 }
 
-pub fn load() -> Result<Config, Error> {
+pub fn load() -> Result<Config, envy::Error> {
     let config_flat = envy::prefixed("CIRCUIT_BREAKER_").from_env::<ConfigFlat>()?;
 
     Ok(Config {
