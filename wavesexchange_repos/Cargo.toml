@@ -7,8 +7,9 @@ authors = ["Artem Sidorenko <asidorenko@uniqsoft.ae>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1.58"
 deadpool-diesel = "0.4.0"
 derive_builder = "0.11.2"
 diesel = { version = "2.0.2", features = ["postgres"] }
+envy = "0.4.2"
+serde = { version = "1.0.147", features = ["derive"] }
 thiserror = "1.0.37"

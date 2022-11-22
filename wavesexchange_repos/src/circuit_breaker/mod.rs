@@ -5,6 +5,11 @@
 разрывы соединений:
     разные бд (pg, redis), разные пулы (bb8, deadpool, r2d2), одиночный запрос, возможность расширения
 */
+pub mod config;
+pub mod error;
+pub mod impls;
+
+use error::Error;
 use std::{
     future::Future,
     num::NonZeroUsize,
@@ -114,7 +119,6 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
     }
 }
 
-#[async_trait]
 pub trait FallibleDataSource {
     const REINIT_ON_FAIL: bool;
     type Error;
@@ -124,28 +128,4 @@ pub trait FallibleDataSource {
     fn fallback(&self) -> Self::Error {
         panic!("Я ГОВОРЮ НЕ БЫЛО РАЗРЫВОВ СВЯЗИ! С НОЯБРЯ ПРОШЛОГО ГОДА! А СЕЙЧАС ЦЕЛЫХ ЧЕТЫРЕ РАЗРЫВА БЫЛО!")
     }
-}
-
-pub mod impls {
-    use super::*;
-    use deadpool_diesel::{Manager, Pool};
-    use diesel::pg::PgConnection;
-    use diesel::result::Error as DslError;
-
-    pub struct DeadpoolPgBreaker(Pool<Manager<PgConnection>>);
-
-    impl FallibleDataSource for DeadpoolPgBreaker {
-        const REINIT_ON_FAIL: bool = true;
-        type Error = DslError;
-
-        fn is_countable_err(err: &Self::Error) -> bool {
-            err.to_string().contains("no connection to the server")
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("CircuitBreakerBuilderError: {0}")]
-    BuilderError(String),
 }
