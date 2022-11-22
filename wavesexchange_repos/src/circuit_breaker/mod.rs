@@ -7,28 +7,32 @@
 */
 pub mod config;
 pub mod error;
-pub mod impls;
 
 pub use config::Config;
 pub use error::Error;
-pub use impls::*;
 
 use std::{
     future::Future,
+    mem::drop,
     num::NonZeroUsize,
     time::{Duration, Instant},
 };
+use tokio::sync::RwLock;
 
 pub trait SharedFn<S>: Fn() -> S + Send + Sync + 'static {}
 impl<T, S> SharedFn<S> for T where T: Fn() -> S + Send + Sync + 'static {}
 
 pub struct CircuitBreaker<S: FallibleDataSource> {
-    data_source: S,
-    err_count: usize, // current errors count
-    first_err_ts: Option<Instant>,
     max_timespan: Duration, // максимальный временной промежуток, в котором будут считаться ошибки
     max_err_count_per_timespan: NonZeroUsize,
     init_fn: Box<dyn SharedFn<S>>,
+    state: RwLock<CBState<S>>,
+}
+
+pub struct CBState<S: FallibleDataSource> {
+    data_source: S,
+    err_count: usize, // current errors count
+    first_err_ts: Option<Instant>,
 }
 
 pub struct CircuitBreakerBuilder<S: FallibleDataSource> {
@@ -79,9 +83,11 @@ impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
         let init_fn = self.init_fn.unwrap();
 
         Ok(CircuitBreaker {
-            data_source: init_fn(),
-            err_count: 0,
-            first_err_ts: None,
+            state: RwLock::new(CBState {
+                data_source: init_fn(),
+                err_count: 0,
+                first_err_ts: None,
+            }),
             max_timespan: self.max_timespan.unwrap(),
             max_err_count_per_timespan: self.max_err_count_per_timespan.unwrap(),
             init_fn,
@@ -100,32 +106,37 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
             .max_timespan(cfg.max_timespan)
     }
 
-    pub async fn query<T, F, Fut>(&mut self, query_fn: F) -> Result<T, S::Error>
+    pub async fn query<T, F, Fut>(&self, query_fn: F) -> Result<T, S::Error>
     where
         F: Fn(&S) -> Fut,
         Fut: Future<Output = Result<T, S::Error>>,
     {
-        let result = query_fn(&self.data_source).await;
+        let data_src_read_lock = &self.state.read().await.data_source;
+        let result = query_fn(&data_src_read_lock).await;
 
         if let Err(e) = &result {
             if S::is_countable_err(e) {
-                self.err_count += 1;
-                match self.first_err_ts {
+                drop(data_src_read_lock);
+                let mut state = self.state.write().await;
+                state.err_count += 1;
+                match state.first_err_ts {
                     Some(ts) if ts.elapsed() <= self.max_timespan => {
-                        if self.err_count > self.max_err_count_per_timespan.get() {
-                            return Err(self.data_source.fallback());
+                        if state.err_count > self.max_err_count_per_timespan.get() {
+                            return Err(state.data_source.fallback());
                         }
                     }
-                    None => self.first_err_ts = Some(Instant::now()),
+                    None => state.first_err_ts = Some(Instant::now()),
                     _ => {}
                 }
                 if S::REINIT_ON_FAIL {
-                    self.data_source = (self.init_fn)();
+                    state.data_source = (self.init_fn)();
                 }
             }
         } else {
-            self.err_count = 0;
-            self.first_err_ts = None;
+            drop(data_src_read_lock);
+            let mut state = self.state.write().await;
+            state.err_count = 0;
+            state.first_err_ts = None;
         }
         result
     }
