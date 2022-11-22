@@ -43,8 +43,8 @@ impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
         }
     }
 
-    pub fn max_timespan(mut self, ts: usize) -> CircuitBreakerBuilder<S> {
-        self.max_err_count_per_timespan = NonZeroUsize::new(ts);
+    pub fn max_timespan(mut self, ts: Duration) -> CircuitBreakerBuilder<S> {
+        self.max_timespan = Some(ts);
         self
     }
 
@@ -89,6 +89,12 @@ impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
 impl<S: FallibleDataSource> CircuitBreaker<S> {
     pub fn builder() -> CircuitBreakerBuilder<S> {
         CircuitBreakerBuilder::new()
+    }
+
+    pub fn builder_from_cfg(cfg: &Config) -> CircuitBreakerBuilder<S> {
+        Self::builder()
+            .max_err_count_per_timespan(cfg.max_err_count_per_timespan)
+            .max_timespan(cfg.max_timespan)
     }
 
     pub async fn query<T, F, Fut>(&mut self, query_fn: F) -> Result<T, S::Error>
