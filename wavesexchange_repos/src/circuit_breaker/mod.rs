@@ -19,19 +19,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub trait SharedFn<S>: Fn() -> S + Send + Sync + 'static {}
+impl<T, S> SharedFn<S> for T where T: Fn() -> S + Send + Sync + 'static {}
+
 pub struct CircuitBreaker<S: FallibleDataSource> {
     data_source: S,
     err_count: usize, // current errors count
     first_err_ts: Option<Instant>,
     max_timespan: Duration, // максимальный временной промежуток, в котором будут считаться ошибки
     max_err_count_per_timespan: NonZeroUsize,
-    init_fn: Box<dyn Fn() -> S>,
+    init_fn: Box<dyn SharedFn<S>>,
 }
 
 pub struct CircuitBreakerBuilder<S: FallibleDataSource> {
     max_timespan: Option<Duration>,
     max_err_count_per_timespan: Option<NonZeroUsize>,
-    init_fn: Option<Box<dyn Fn() -> S>>,
+    init_fn: Option<Box<dyn SharedFn<S>>>,
 }
 
 impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
@@ -53,7 +56,7 @@ impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
         self
     }
 
-    pub fn init_fn(mut self, f: impl Fn() -> S + 'static) -> CircuitBreakerBuilder<S> {
+    pub fn init_fn(mut self, f: impl SharedFn<S>) -> CircuitBreakerBuilder<S> {
         self.init_fn = Some(Box::new(f));
         self
     }
