@@ -1,10 +1,3 @@
-/*
-послать запрос к удалённому ресурсу
-если пришла ошибка соединения, то зафиксировать и вернуть ошибку в Result
-если разрывы соединений продолжаются, выкинуть панику (или вызвать соотв обработчик)
-разрывы соединений:
-    разные бд (pg, redis), разные пулы (bb8, deadpool, r2d2), одиночный запрос, возможность расширения
-*/
 pub mod config;
 pub mod error;
 
@@ -25,7 +18,7 @@ pub trait SharedFn<S>: Fn() -> S + Send + Sync + 'static {}
 impl<T, S> SharedFn<S> for T where T: Fn() -> S + Send + Sync + 'static {}
 
 pub struct CircuitBreaker<S: FallibleDataSource> {
-    max_timespan: Duration, // максимальный временной промежуток, в котором будут считаться ошибки
+    max_timespan: Duration,
     max_err_count_per_timespan: NonZeroUsize,
     init_fn: Box<dyn SharedFn<S>>,
     state: RwLock<CBState<S>>,
@@ -33,7 +26,7 @@ pub struct CircuitBreaker<S: FallibleDataSource> {
 
 pub struct CBState<S: FallibleDataSource> {
     data_source: Arc<S>,
-    err_count: usize, // current errors count
+    err_count: usize,
     first_err_ts: Option<Instant>,
 }
 
@@ -110,7 +103,6 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
 
     pub async fn query<T, F, Fut>(&self, query_fn: F) -> Result<T, S::Error>
     where
-        //todo: figure out how to FnOnce(&S)
         F: FnOnce(Arc<S>) -> Fut,
         Fut: Future<Output = Result<T, S::Error>>,
     {
