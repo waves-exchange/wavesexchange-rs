@@ -38,19 +38,19 @@ pub mod dto {
     use bigdecimal::BigDecimal;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Deserialize, Clone)]
+    #[derive(Deserialize, Clone, Debug)]
     pub struct RatesResponse {
         pub data: Vec<Rate>,
     }
 
-    #[derive(Deserialize, Clone)]
+    #[derive(Deserialize, Clone, Debug)]
     pub struct Rate {
         pub pair: String,
         pub heuristics: Vec<String>,
         pub data: RateData,
     }
 
-    #[derive(Deserialize, Clone)]
+    #[derive(Deserialize, Clone, Debug)]
     pub struct RateData {
         pub rate: BigDecimal,
         pub heuristic: Option<BigDecimal>,
