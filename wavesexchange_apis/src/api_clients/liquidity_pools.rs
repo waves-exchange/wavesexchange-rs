@@ -12,27 +12,11 @@ impl HttpClient<LiquidityPools> {
             .execute()
             .await
     }
-
-    pub async fn pools_amounts(&self) -> ApiResult<List<dto::LiquidityPoolAmount>> {
-        self.create_req_handler(
-            self.http_get("pools_amounts"),
-            "liquidity_pools::pools_amounts",
-        )
-        .execute()
-        .await
-    }
 }
 
 pub mod dto {
     use bigdecimal::BigDecimal;
     use serde::{Deserialize, Serialize};
-
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct LiquidityPoolAmount {
-        pub pool_address: String,
-        pub asset_id: String,
-        pub amount: BigDecimal,
-    }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     #[serde(tag = "type", rename = "liquidity_pool_stats")]
