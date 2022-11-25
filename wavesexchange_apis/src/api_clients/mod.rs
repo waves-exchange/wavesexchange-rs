@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod balances;
 pub mod blockchain_updates;
 pub mod data_service;
 pub mod identity;
@@ -12,6 +13,7 @@ pub mod state;
 pub mod transfers;
 
 pub use assets::AssetsService;
+pub use balances::BalancesService;
 pub use blockchain_updates::BlockchainUpdates;
 pub use data_service::DataService;
 pub use identity::Identity;

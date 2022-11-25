@@ -12,9 +12,18 @@ impl HttpClient<BalancesService> {
         pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
         height: Option<i32>,
     ) -> ApiResult<dto::BalancesResponse> {
+
+        let balances_url = match height {
+            Some(h) => format!("balance_history?height={}", h),
+            None => "balance_history".into()
+        };
+
         let pairs = pairs
             .into_iter()
-            .map(|(adress, asset_id)| dto::AddressAssetPair { address, asset_id })
+            .map(|(address, asset_id)| dto::AddressAssetPair {
+                address: address.into(),
+                asset_id: asset_id.into(),
+            })
             .collect::<Vec<_>>();
 
         let mut balances = vec![];
@@ -23,16 +32,16 @@ impl HttpClient<BalancesService> {
             let body = dto::BalancesRequest {
                 address_asset_pairs: chunk_pairs.to_vec(),
             };
-
+            
             let mut resp: dto::BalancesResponse = self
                 .create_req_handler(
-                    self.http_post("balance_history").json(&body),
+                    self.http_post(balances_url.clone()).json(&body),
                     "balances::balance_history",
                 )
                 .execute()
                 .await?;
 
-            balances.append(&mut resp.data);
+            balances.append(&mut resp.items);
         }
 
         Ok(dto::BalancesResponse { items: balances })
@@ -46,13 +55,13 @@ pub mod dto {
 
     #[derive(Debug, Serialize)]
     pub struct BalancesRequest {
-        address_asset_pairs: Vec<AddressAssetPair>,
+        pub address_asset_pairs: Vec<AddressAssetPair>,
     }
 
-    #[derive(Debug, Serialize)]
+    #[derive(Debug, Serialize, Clone)]
     pub struct AddressAssetPair {
-        address: String,
-        asset_id: String,
+        pub address: String,
+        pub asset_id: String,
     }
 
     #[derive(Deserialize, Clone, Debug)]
@@ -62,10 +71,10 @@ pub mod dto {
 
     #[derive(Deserialize, Clone, Debug)]
     pub struct Balance {
-        address: String,
-        asset_id: String,
-        amount: BigDecimal,
-        block_height: i32,
-        block_timestamp: DateTime,
+        pub address: String,
+        pub asset_id: String,
+        pub amount: BigDecimal,
+        pub block_height: i32,
+        pub block_timestamp: DateTime<Utc>,
     }
 }
