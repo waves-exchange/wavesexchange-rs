@@ -29,3 +29,5 @@ pub use transfers::Transfers;
 use std::fmt::Debug;
 
 pub trait BaseApi: Sync + Clone + Debug {}
+
+impl BaseApi for () {}
