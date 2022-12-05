@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+
 use crate::{ApiResult, BaseApi, HttpClient};
 use std::fmt::Debug;
 
@@ -12,10 +14,9 @@ impl HttpClient<BalancesService> {
         pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
         height: Option<i32>,
     ) -> ApiResult<dto::BalancesResponse> {
-
         let balances_url = match height {
             Some(h) => format!("balance_history?height={}", h),
-            None => "balance_history".into()
+            None => "balance_history".into(),
         };
 
         let pairs = pairs
@@ -32,7 +33,7 @@ impl HttpClient<BalancesService> {
             let body = dto::BalancesRequest {
                 address_asset_pairs: chunk_pairs.to_vec(),
             };
-            
+
             let mut resp: dto::BalancesResponse = self
                 .create_req_handler(
                     self.http_post(balances_url.clone()).json(&body),
@@ -45,6 +46,40 @@ impl HttpClient<BalancesService> {
         }
 
         Ok(dto::BalancesResponse { items: balances })
+    }
+
+    pub async fn balance_aggregates(
+        &self,
+        address: impl Into<String>,
+        asset_id: impl Into<String>,
+        date_from: Option<DateTime<Utc>>,
+        date_to: Option<DateTime<Utc>>,
+    ) -> ApiResult<dto::BalancesAggResponse> {
+        let mut url = format!(
+            "balance_history/aggregates/{}/{}",
+            address.into(),
+            asset_id.into()
+        );
+
+        match (date_from, date_to) {
+            (Some(f), Some(d)) => url = format!("{}?date_from={}&date_to={}", url, f, d),
+            (Some(f), None) => url = format!("{}?date_from={}", url, f),
+            (None, Some(d)) => url = format!("{}?date_to={}", url, d),
+            (None, None) => {}
+        }
+
+        let mut balances = vec![];
+        let mut resp: dto::BalancesAggResponse = self
+            .create_req_handler(
+                self.http_get(url.clone()),
+                "balances::balance_history/aggregates",
+            )
+            .execute()
+            .await?;
+
+        balances.append(&mut resp.items);
+
+        Ok(dto::BalancesAggResponse { items: balances })
     }
 }
 
@@ -70,11 +105,23 @@ pub mod dto {
     }
 
     #[derive(Deserialize, Clone, Debug)]
+    pub struct BalancesAggResponse {
+        pub items: Vec<BalanceAggItem>,
+    }
+
+    #[derive(Deserialize, Clone, Debug)]
     pub struct Balance {
         pub address: String,
         pub asset_id: String,
         pub amount: BigDecimal,
         pub block_height: i32,
         pub block_timestamp: DateTime<Utc>,
+    }
+
+    #[derive(Deserialize, Clone, Debug)]
+    pub struct BalanceAggItem {
+        pub amount_begin: BigDecimal,
+        pub amount_end: BigDecimal,
+        pub date_stamp: DateTime<Utc>,
     }
 }
