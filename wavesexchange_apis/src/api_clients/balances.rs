@@ -19,31 +19,30 @@ impl HttpClient<BalancesService> {
             None => "balance_history".into(),
         };
 
-        let pairs = pairs
+        let mut balances = vec![];
+
+        pairs
             .into_iter()
             .map(|(address, asset_id)| dto::AddressAssetPair {
                 address: address.into(),
                 asset_id: asset_id.into(),
             })
-            .collect::<Vec<_>>();
+            .chunks(100)
+            .for_each(|chunk| {
+                let body = dto::BalancesRequest {
+                    address_asset_pairs: chunk.to_vec(),
+                };
 
-        let mut balances = vec![];
+                let mut resp: dto::BalancesResponse = self
+                    .create_req_handler(
+                        self.http_post(balances_url.clone()).json(&body),
+                        "balances::balance_history",
+                    )
+                    .execute()
+                    .await?;
 
-        for chunk_pairs in pairs.chunks(100) {
-            let body = dto::BalancesRequest {
-                address_asset_pairs: chunk_pairs.to_vec(),
-            };
-
-            let mut resp: dto::BalancesResponse = self
-                .create_req_handler(
-                    self.http_post(balances_url.clone()).json(&body),
-                    "balances::balance_history",
-                )
-                .execute()
-                .await?;
-
-            balances.append(&mut resp.items);
-        }
+                balances.append(&mut resp.items);
+            });
 
         Ok(dto::BalancesResponse { items: balances })
     }
@@ -68,7 +67,6 @@ impl HttpClient<BalancesService> {
             (None, None) => {}
         }
 
-        let mut balances = vec![];
         let mut resp: dto::BalancesAggResponse = self
             .create_req_handler(
                 self.http_get(url.clone()),
@@ -77,9 +75,7 @@ impl HttpClient<BalancesService> {
             .execute()
             .await?;
 
-        balances.append(&mut resp.items);
-
-        Ok(dto::BalancesAggResponse { items: balances })
+        Ok(dto::BalancesAggResponse { items: resp.items })
     }
 }
 
