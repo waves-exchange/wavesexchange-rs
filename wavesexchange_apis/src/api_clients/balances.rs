@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 
 use crate::{ApiResult, BaseApi, HttpClient};
 use std::fmt::Debug;
@@ -19,31 +20,31 @@ impl HttpClient<BalancesService> {
             None => "balance_history".into(),
         };
 
-        let mut balances = vec![];
-
-        pairs
+        let pairs = pairs
             .into_iter()
             .map(|(address, asset_id)| dto::AddressAssetPair {
                 address: address.into(),
                 asset_id: asset_id.into(),
             })
-            .chunks(100)
-            .for_each(|chunk| {
-                let body = dto::BalancesRequest {
-                    address_asset_pairs: chunk.to_vec(),
-                };
+            .collect::<Vec<_>>();
 
-                let mut resp: dto::BalancesResponse = self
-                    .create_req_handler(
-                        self.http_post(balances_url.clone()).json(&body),
-                        "balances::balance_history",
-                    )
-                    .execute()
-                    .await?;
+        let mut balances = vec![];
 
-                balances.append(&mut resp.items);
-            });
+        for chunk_pairs in pairs.chunks(100) {
+            let body = dto::BalancesRequest {
+                address_asset_pairs: chunk_pairs.to_vec(),
+            };
 
+            let mut resp: dto::BalancesResponse = self
+                .create_req_handler(
+                    self.http_post(balances_url.clone()).json(&body),
+                    "balances::balance_history",
+                )
+                .execute()
+                .await?;
+
+            balances.append(&mut resp.items);
+        }
         Ok(dto::BalancesResponse { items: balances })
     }
 
@@ -67,7 +68,7 @@ impl HttpClient<BalancesService> {
             (None, None) => {}
         }
 
-        let mut resp: dto::BalancesAggResponse = self
+        let resp: dto::BalancesAggResponse = self
             .create_req_handler(
                 self.http_get(url.clone()),
                 "balances::balance_history/aggregates",
