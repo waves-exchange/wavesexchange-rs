@@ -1,5 +1,4 @@
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 
 use crate::{ApiResult, BaseApi, HttpClient};
 use std::fmt::Debug;

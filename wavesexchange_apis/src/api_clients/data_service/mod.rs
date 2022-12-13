@@ -9,6 +9,7 @@ pub struct DataService;
 impl BaseApi for DataService {}
 
 pub mod dto {
+    use bigdecimal::BigDecimal;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use serde::{Deserialize, Serialize};
 
@@ -180,6 +181,28 @@ pub mod dto {
     pub struct GenericTransactionData {
         pub id: String,
         pub height: u32,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Pair {
+        pub data: PairData,
+        pub amount_asset: String,
+        pub price_asset: String,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct PairData {
+        pub first_price: BigDecimal,
+        pub last_price: BigDecimal,
+        pub volume: BigDecimal,
+        pub quote_volume: BigDecimal,
+        pub high: BigDecimal,
+        pub low: BigDecimal,
+        pub weighted_average_price: BigDecimal,
+        pub txs_count: BigDecimal,
+        pub volume_waves: BigDecimal,
     }
 }
 
