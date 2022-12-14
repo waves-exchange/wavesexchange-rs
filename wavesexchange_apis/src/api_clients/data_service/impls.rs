@@ -147,11 +147,12 @@ impl HttpClient<DataService> {
         .map(List::from)
     }
 
-    pub async fn pairs(&self) -> ApiResult<List<Vec<dto::Pair>>> {
+    pub async fn pairs(&self) -> ApiResult<List<dto::Pair>> {
         //FIXME: fetch all pages
-        self.create_req_handler(self.http_get("pairs"), "data_service::pairs")
+        self.create_req_handler::<DSList<_>>(self.http_get("pairs"), "data_service::pairs")
             .execute()
             .await
+            .map(List::from)
     }
 }
 

@@ -7,6 +7,15 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use wavesexchange_log::debug;
 
+/// A rust http interface to various waves services (non-exhaustive)
+///
+/// Usage example:
+/// ```rust,no_run
+/// use wavesexchange_apis::{HttpClient, LiquidityPools};
+///
+/// let client = HttpClient::<LiquidityPools>::from_base_url(liquidity_pools_url);
+/// client.stats().await;
+/// ```
 #[derive(Clone, Debug)]
 pub struct HttpClient<A: BaseApi> {
     base_url: Option<String>,
@@ -15,6 +24,7 @@ pub struct HttpClient<A: BaseApi> {
 }
 
 impl<A: BaseApi> HttpClient<A> {
+    /// Create an `HttpClient` without base url
     pub fn new() -> Self {
         Self::builder().build()
     }
@@ -23,6 +33,7 @@ impl<A: BaseApi> HttpClient<A> {
         HttpClientBuilder::new()
     }
 
+    /// Create an `HttpClient` with base url
     pub fn from_base_url(url: impl Into<String>) -> Self {
         HttpClientBuilder::new().with_base_url(url).build()
     }
@@ -34,14 +45,17 @@ impl<A: BaseApi> HttpClient<A> {
         }
     }
 
+    /// Perform a GET request on `self.base_url/url`
     pub fn http_get(&self, url: impl Into<String>) -> RequestBuilder {
         self.client.get(self.prepare_url(url))
     }
 
+    /// Perform a POST request on `self.base_url/url`
     pub fn http_post(&self, url: impl Into<String>) -> RequestBuilder {
         self.client.post(self.prepare_url(url))
     }
 
+    /// Get reqwest client
     pub fn get_client(&self) -> &Client {
         &self.client
     }
