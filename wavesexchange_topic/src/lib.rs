@@ -340,13 +340,7 @@ mod parse_and_format {
                     Err(_) => return Err(TopicParseError::InvalidExchangePairs),
                     Ok(q_pair) => {
                         for p in q_pair {
-                            let pair = p.split("/").collect::<Vec<&str>>();
-
-                            if pair.len() != 2 {
-                                return Err(TopicParseError::InvalidExchangePairs);
-                            }
-
-                            let mut pair = pair.iter();
+                            let mut pair = p.split("/");
 
                             if let (Some(amount_asset), Some(price_asset)) =
                                 (pair.next(), pair.next())
@@ -356,6 +350,8 @@ mod parse_and_format {
                                     price_asset: (*price_asset).into(),
                                 };
                                 pairs.push(p);
+                            } else {
+                                return Err(TopicParseError::InvalidExchangePairs);
                             }
                         }
                     }
@@ -364,7 +360,7 @@ mod parse_and_format {
                 Ok(ExchangePairs { pairs })
             }
 
-            pub fn extract_exchange_pairs_from_query(
+            fn extract_exchange_pairs_from_query(
                 url: &Url,
             ) -> Result<ExchangePairs, TopicParseError> {
                 let mut pairs = vec![];
