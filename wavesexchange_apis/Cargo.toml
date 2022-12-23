@@ -22,7 +22,6 @@ serde_qs = "0.8.5"
 serde_repr = "0.1.7"
 thiserror = "1.0.30"
 tokio = { version = "1.15.0", features = ["macros", "rt-multi-thread"] }
-tonic = "0.5"
-waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", rev = "44b306885be296bbfebcd37bef64b4dbbec8502a" }
+waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
 wavesexchange_log = { path = "../wavesexchange_log" }
 wavesexchange_warp = { path = "../wavesexchange_warp" }

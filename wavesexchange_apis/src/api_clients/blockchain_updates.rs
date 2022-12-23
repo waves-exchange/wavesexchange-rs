@@ -5,11 +5,14 @@ use std::{
     convert::{From, Into, TryFrom, TryInto},
     sync::Arc,
 };
-use waves_protobuf_schemas::waves::events::{
-    blockchain_updated::{Append, Update},
-    grpc::{GetBlockUpdateRequest, GetBlockUpdateResponse},
-    state_update::BalanceUpdate,
-    BlockchainUpdated,
+use waves_protobuf_schemas::{
+    tonic,
+    waves::events::{
+        blockchain_updated::{Append, Update},
+        grpc::{GetBlockUpdateRequest, GetBlockUpdateResponse},
+        state_update::BalanceUpdate,
+        BlockchainUpdated,
+    },
 };
 
 #[derive(Clone, Debug)]
