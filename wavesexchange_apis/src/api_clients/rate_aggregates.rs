@@ -14,8 +14,12 @@ impl HttpClient<RateAggregates> {
         start_date_inclusive: NaiveDate,
         end_date_inclusive: NaiveDate,
     ) -> ApiResult<dto::RateAggregatesResponse> {
-        let timestamp_gte = start_date_inclusive.and_hms(0, 0, 0);
-        let timestamp_lt = (end_date_inclusive + Duration::days(1)).and_hms(0, 0, 0);
+        let timestamp_gte = start_date_inclusive
+            .and_hms_opt(0, 0, 0)
+            .expect("invalid time");
+        let timestamp_lt = (end_date_inclusive + Duration::days(1))
+            .and_hms_opt(0, 0, 0)
+            .expect("invalid time");
 
         let request_url = format!(
             "rate_aggregates?pairs[]={}/{}&timestamp__gte={:?}&timestamp__lt={:?}",

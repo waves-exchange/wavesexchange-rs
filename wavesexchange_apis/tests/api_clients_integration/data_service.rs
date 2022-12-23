@@ -1,5 +1,5 @@
 use crate::common::MAINNET;
-use chrono::{Date, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use wavesexchange_apis::{data_service::dto, DataService, HttpClient};
 
 const WAVES: &str = "WAVES";
@@ -27,7 +27,10 @@ async fn fetch_rates_batch_from_data_service() {
 #[tokio::test]
 async fn fetch_invokes_control_contract_finalize_current_price_v2() {
     // example invoke TS: 2021-06-21T16:38:52
-    let timestamp_lt = NaiveDate::from_ymd(2021, 06, 21).and_hms(16, 38, 53);
+    let timestamp_lt = NaiveDate::from_ymd_opt(2021, 06, 21)
+        .unwrap()
+        .and_hms_opt(16, 38, 53)
+        .unwrap();
 
     let invokes = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
         .invoke_script_transactions(
@@ -72,15 +75,28 @@ async fn fetch_invokes_control_contract_finalize_current_price_v2() {
 
 #[tokio::test]
 async fn get_exchange_transactions() {
-    let date = Date::from_utc(NaiveDate::from_ymd(2021, 05, 01), Utc);
+    let date1 = DateTime::from_utc(
+        NaiveDate::from_ymd_opt(2021, 05, 01)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap(),
+        Utc,
+    );
+    let date2 = DateTime::from_utc(
+        NaiveDate::from_ymd_opt(2021, 05, 01)
+            .unwrap()
+            .and_hms_opt(0, 30, 0)
+            .unwrap(),
+        Utc,
+    );
 
     let txs_resp = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
         .transactions_exchange(
             Option::<String>::None,
             Some(WAVES),
             Some(USDN_ASSET_ID),
-            Some(date.and_hms(0, 0, 0)),
-            Some(date.and_hms(0, 30, 0)),
+            Some(date1),
+            Some(date2),
             dto::Sort::Desc,
             3,
             Option::<String>::None,
