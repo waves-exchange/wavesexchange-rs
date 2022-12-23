@@ -353,6 +353,10 @@ mod parse_and_format {
                             } else {
                                 return Err(TopicParseError::InvalidExchangePairs);
                             }
+
+                            if pair.next().is_some() {
+                                return Err(TopicParseError::InvalidExchangePairs);
+                            }
                         }
                     }
                 }
@@ -760,7 +764,8 @@ mod parse_and_format {
                 "topic://pairs?pairs[]=amount_asset1",
                 "topic://pairs/amount_asset/price_asset?pairs[]=skip/skip",
                 "topic://pairs/amount_asset/price_asset/err",
-                "topic://pairs?pairs[]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1"
+                "topic://pairs?pairs[]=amount_asset/price_asset&pairs[1]=amount_asset1/price_asset1",
+                "topic://pairs?pairs[]=amount_asset/price_asset/err",
             ];
 
             for url in err_urls {
