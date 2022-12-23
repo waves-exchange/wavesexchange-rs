@@ -126,7 +126,7 @@ pub struct ExchangePair {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ExchangePairs {
-    pairs: Vec<ExchangePair>,
+    pub pairs: Vec<ExchangePair>,
 }
 
 mod parse_and_format {
