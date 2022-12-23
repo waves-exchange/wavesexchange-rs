@@ -1,6 +1,8 @@
 use crate::{ApiResult, BaseApi};
 use std::{marker::PhantomData, sync::Arc};
-use waves_protobuf_schemas::waves::events::grpc::blockchain_updates_api_client::BlockchainUpdatesApiClient;
+use waves_protobuf_schemas::tonic;
+
+pub use waves_protobuf_schemas::waves::events::grpc::blockchain_updates_api_client::BlockchainUpdatesApiClient;
 
 #[derive(Clone, Debug)]
 pub struct GrpcClient<A: BaseApi> {

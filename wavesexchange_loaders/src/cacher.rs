@@ -1,5 +1,5 @@
 use anymap::{any::Any, Map};
-use cached::async_mutex::Mutex;
+use cached::async_sync::Mutex;
 use dataloader::cached::Cache as DlCache;
 use once_cell::sync::Lazy;
 use std::fmt::Debug;
