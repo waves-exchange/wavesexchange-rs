@@ -50,6 +50,9 @@ pub use cached::{SizedCache, TimedCache, TimedSizedCache, UnboundCache};
 pub use error::LoaderError;
 pub use loaders::{CachedLoader, InnerCachedLoader, InnerLoader, Loader, NonCachedLoader};
 
+// Reexport cached
+pub use cached;
+
 #[macro_use]
 extern crate async_trait;
 

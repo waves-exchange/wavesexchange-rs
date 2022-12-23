@@ -1,6 +1,8 @@
 use reqwest::{Error as ReqError, Response};
 use std::sync::Arc;
-use waves_protobuf_schemas::tonic;
+
+pub use reqwest;
+pub use waves_protobuf_schemas::tonic;
 
 pub type ApiResult<T> = Result<T, Error>;
 
