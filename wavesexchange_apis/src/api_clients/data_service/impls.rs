@@ -81,6 +81,9 @@ impl HttpClient<DataService> {
         .map(List::from)
     }
 
+    //TODO Why this fn returns `dto::GenericTransactionResponse`
+    // while similar fn `transactions_exchange` returns `dto::ExchangeTransaction`?
+    // Is there a real reason for it, or we can use here `dto::ExchangeTransaction` as well?
     pub async fn last_exchange_transaction_to_date(
         &self,
         sender: impl AsRef<str>,
@@ -113,6 +116,9 @@ impl HttpClient<DataService> {
             .await
     }
 
+    //TODO Why this fn returns `dto::ExchangeTransaction`
+    // while similar fn `last_exchange_transaction_to_date` returns `dto::GenericTransactionResponse`?
+    // Is there a real reason for it?
     pub async fn transactions_exchange(
         &self,
         sender: Option<impl AsRef<str>>,

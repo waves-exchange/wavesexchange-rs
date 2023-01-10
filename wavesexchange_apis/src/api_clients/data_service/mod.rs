@@ -43,6 +43,8 @@ pub mod dto {
         pub ticker: Option<String>,
     }
 
+    //TODO This struct looks like a specialized version of `GenericTransactionData`,
+    // then why it lacks `height` field?
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ExchangeTransaction {
@@ -94,6 +96,9 @@ pub mod dto {
         Sell,
     }
 
+    //TODO Why do we need this struct in API return values?
+    // Looks like implementation detail (deserialization) and probably should be made private
+    // and removed from all return values. Or at least write a comment justifying its use in public API.
     #[derive(Serialize, Deserialize)]
     pub struct Data<T> {
         pub data: T,
