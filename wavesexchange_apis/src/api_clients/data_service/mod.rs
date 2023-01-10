@@ -43,13 +43,11 @@ pub mod dto {
         pub ticker: Option<String>,
     }
 
-    //TODO This struct looks like a specialized version of `GenericTransactionData`,
-    // then why it lacks `height` field?
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ExchangeTransaction {
-        // only trade-related data so far
         pub id: String,
+        pub height: u32,
         pub timestamp: DateTime<Utc>,
         pub amount: f64,
         pub price: f64,
