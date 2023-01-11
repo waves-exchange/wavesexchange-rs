@@ -21,14 +21,14 @@ pub mod dto {
         pub is_last_page: bool,
     }
 
-    #[derive(Debug, Deserialize, Clone)]
+    #[derive(Debug, Clone, Copy, Deserialize)]
     #[serde(rename_all = "snake_case")]
     pub enum TransactionApplicationStatus {
         Succeeded,
         Failed,
     }
 
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
     #[serde(rename_all = "snake_case")]
     pub enum Sort {
         Asc,
@@ -36,7 +36,6 @@ pub mod dto {
     }
 
     #[derive(Debug, Clone, Deserialize)]
-
     pub struct AssetInfo {
         pub id: String,
         pub precision: u8,
@@ -87,7 +86,7 @@ pub mod dto {
         pub price_asset: String,
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
     #[serde(rename_all = "lowercase")]
     pub enum OrderType {
         Buy,
@@ -97,12 +96,12 @@ pub mod dto {
     //TODO Why do we need this struct in API return values?
     // Looks like implementation detail (deserialization) and probably should be made private
     // and removed from all return values. Or at least write a comment justifying its use in public API.
-    #[derive(Serialize, Deserialize)]
+    #[derive(Clone, Serialize, Deserialize)]
     pub struct Data<T> {
         pub data: T,
     }
 
-    #[derive(Serialize)]
+    #[derive(Clone, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub(super) struct ExchangeTransactionsQueryParams {
         pub amount_asset: Option<String>,
@@ -115,24 +114,24 @@ pub mod dto {
         pub after: Option<String>,
     }
 
-    #[derive(Debug, Serialize)]
+    #[derive(Debug, Clone, Serialize)]
     pub(super) struct RatesRequest {
         pub pairs: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub timestamp: Option<NaiveDateTime>,
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub struct RatesResponse {
         pub data: Vec<RateOuter>,
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub struct RateOuter {
         pub data: Rate,
     }
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub struct Rate {
         pub rate: f64,
     }
@@ -159,13 +158,13 @@ pub mod dto {
         // ...
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct InvokeScriptCallResponse {
         pub function: String,
         pub args: Vec<InvokeScriptArgumentResponse>,
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
     pub enum InvokeScriptArgumentResponse {
         #[serde(rename = "string")]
@@ -186,7 +185,7 @@ pub mod dto {
         pub height: u32,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Pair {
         pub data: PairData,
@@ -194,7 +193,7 @@ pub mod dto {
         pub price_asset: String,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct PairData {
         pub first_price: BigDecimal,
