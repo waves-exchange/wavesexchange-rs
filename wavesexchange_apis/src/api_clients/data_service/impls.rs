@@ -154,11 +154,26 @@ impl HttpClient<DataService> {
     }
 
     pub async fn pairs(&self) -> ApiResult<List<dto::Pair>> {
-        //FIXME: fetch all pages
-        self.create_req_handler::<DSList<_>>(self.http_get("pairs"), "data_service::pairs")
+        // Currently Data Service's limit for pairs is up to 1000.
+        // This is enough to fetch all available pairs as of now.
+        // When it will not be enough, proper pagination support
+        // for this request to be implemented.
+        const MAX_LIMIT: usize = 1000;
+
+        let res = self
+            .create_req_handler::<DSList<_>>(
+                self.http_get(format!("pairs?limit={MAX_LIMIT}")),
+                "data_service::pairs",
+            )
             .execute()
             .await
-            .map(List::from)
+            .map(List::from)?;
+
+        if res.items.len() == MAX_LIMIT {
+            panic!("Data Service's `pairs` request returned {MAX_LIMIT} items, which is the limit, but probably there are more pairs than that. Proper parination support needed.");
+        }
+
+        Ok(res)
     }
 }
 
