@@ -204,7 +204,7 @@ pub mod dto {
         pub low: BigDecimal,
         pub weighted_average_price: BigDecimal,
         pub txs_count: BigDecimal,
-        pub volume_waves: BigDecimal,
+        pub volume_waves: Option<BigDecimal>,
     }
 }
 
