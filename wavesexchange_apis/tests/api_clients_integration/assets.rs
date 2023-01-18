@@ -8,9 +8,7 @@ async fn test_assets_get() {
         .await
         .unwrap();
     let resp = &resp.data[0];
-    let data = if let dto::AssetInfo::Full(r) = resp.data.as_ref().unwrap() {
-        r
-    } else {
+    let dto::AssetInfo::Full(data) = resp.data.as_ref().unwrap() else {
         panic!("Wrong output format");
     };
     assert_eq!(&data.id, "WAVES");

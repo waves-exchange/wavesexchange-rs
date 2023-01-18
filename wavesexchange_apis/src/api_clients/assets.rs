@@ -20,17 +20,21 @@ impl HttpClient<AssetsService> {
                 cursor: None,
             });
         }
-        let url = serde_qs::to_string(&dto::AssetRequest {
-            ids,
+        let meta = serde_qs::to_string(&dto::AssetMetaRequest {
             height__gte: height,
             format,
             include_metadata,
         })
         .unwrap();
 
-        self.create_req_handler(self.http_get(format!("?{url}")), "assets::get_assets")
-            .execute()
-            .await
+        let body = dto::AssetRequest { ids };
+
+        self.create_req_handler(
+            self.http_post(format!("?{meta}")).json(&body),
+            "assets::get_assets",
+        )
+        .execute()
+        .await
     }
 }
 
@@ -38,7 +42,6 @@ pub mod dto {
     use crate::models::dto::DataEntryValue;
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
-    use serde_repr::{Deserialize_repr, Serialize_repr};
     use std::collections::HashMap;
 
     #[derive(Debug, Deserialize)]
@@ -68,7 +71,6 @@ pub mod dto {
         pub labels: Vec<AssetLabel>,
         pub sponsor_balance: Option<i64>,
         pub has_image: bool,
-        pub verified_status: VerificationStatus,
     }
 
     #[derive(Clone, Debug, Deserialize)]
@@ -86,14 +88,6 @@ pub mod dto {
         CommunityVerified,
         #[serde(rename = "null")]
         WithoutLabels,
-    }
-
-    #[derive(Clone, Debug, Serialize_repr, Deserialize_repr)]
-    #[repr(i8)]
-    pub enum VerificationStatus {
-        Verified = 1,
-        Unknown = 0,
-        Declined = -1,
     }
 
     #[derive(Clone, Debug, Deserialize)]
@@ -137,10 +131,14 @@ pub mod dto {
 
     #[allow(non_snake_case)]
     #[derive(Debug, Serialize)]
-    pub struct AssetRequest {
-        pub ids: Vec<String>,
+    pub struct AssetMetaRequest {
         pub height__gte: Option<u32>,
         pub format: OutputFormat,
         pub include_metadata: bool,
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct AssetRequest {
+        pub ids: Vec<String>,
     }
 }
