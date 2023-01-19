@@ -14,5 +14,5 @@ envy = "0.4.2"
 futures = "0.3.25"
 serde = { version = "1.0.147", features = ["derive"] }
 thiserror = "1.0.37"
-tokio = "1.22.0"
+tokio = { version = "1", features = ["macros"] }
 wavesexchange_log = { path = "../wavesexchange_log" } 
