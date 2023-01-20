@@ -12,7 +12,6 @@ use std::{
 use tokio::sync::RwLock;
 
 pub trait FallibleDataSource {
-    const REINIT_ON_FAIL: bool;
     type Error;
 
     fn is_countable_err(err: &Self::Error) -> bool;
@@ -165,9 +164,7 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
                     }
                     None => state.first_err_ts = Some(Instant::now()),
                 }
-                if S::REINIT_ON_FAIL {
-                    state.reinit((self.init_fn)()?);
-                }
+                state.reinit((self.init_fn)()?);
             }
         } else {
             let mut state = self.state.write().await;
@@ -196,8 +193,6 @@ mod tests {
     }
 
     impl FallibleDataSource for WildErrorGenerator {
-        const REINIT_ON_FAIL: bool = true;
-
         type Error = WildError;
 
         fn is_countable_err(err: &Self::Error) -> bool {
