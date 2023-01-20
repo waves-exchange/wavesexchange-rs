@@ -15,3 +15,6 @@ wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
+
+[features]
+config = []

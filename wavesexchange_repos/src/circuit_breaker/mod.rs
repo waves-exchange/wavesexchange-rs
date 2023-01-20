@@ -1,6 +1,8 @@
+#[cfg(feature = "config")]
 mod config;
 mod error;
 
+#[cfg(feature = "config")]
 pub use config::Config;
 pub use error::CBError;
 use wavesexchange_log::debug;
