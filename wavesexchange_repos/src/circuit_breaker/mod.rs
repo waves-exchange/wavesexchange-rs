@@ -40,7 +40,7 @@ pub struct CircuitBreaker<S: FallibleDataSource> {
     state: RwLock<CBState<S>>,
 }
 
-pub struct CBState<S: FallibleDataSource> {
+struct CBState<S: FallibleDataSource> {
     data_source: Arc<S>,
     err_count: usize,
     first_err_ts: Option<Instant>,
