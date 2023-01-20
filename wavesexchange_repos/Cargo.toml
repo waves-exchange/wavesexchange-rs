@@ -7,12 +7,11 @@ authors = ["Artem Sidorenko <asidorenko@uniqsoft.ae>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-deadpool-diesel = "0.4.0"
-derive_builder = "0.11.2"
-diesel = { version = "2.0.2", features = ["postgres"] }
 envy = "0.4.2"
-futures = "0.3.25"
 serde = { version = "1.0.147", features = ["derive"] }
-thiserror = "1.0.37"
+thiserror = "1.0.38"
+tokio = { version = "1", default-features = false, features = ["sync", "rt-multi-thread"] }
+wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+
+[dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
-wavesexchange_log = { path = "../wavesexchange_log" } 

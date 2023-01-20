@@ -1,6 +1,8 @@
-pub mod config;
+mod config;
+mod error;
 
 pub use config::Config;
+pub use error::CBError;
 use wavesexchange_log::debug;
 
 use std::{
@@ -11,31 +13,9 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-/// A trait represents some data source that can fail.
-/// Must be implemented for a struct that used in circuit breaker.
-pub trait FallibleDataSource {
-    type Error;
+pub trait DataSrcInitFn<S, E>: FnMut() -> Result<S, E> + Send + Sync + 'static {}
 
-    /// Shows if error will increase CB's counter
-    fn is_countable_err(err: &Self::Error) -> bool;
-
-    /// Set up CB's behaviour after maximum errors limit exceeded
-    fn fallback(&self, elapsed_ms: u128, err_count: usize) -> Self::Error {
-        panic!(
-            "CircuitBreaker panicked after {err_count} errors in a row happened in {elapsed_ms}ms"
-        )
-    }
-}
-
-pub trait DataSrcInitFn<S: FallibleDataSource>:
-    Fn() -> Result<S, S::Error> + Send + Sync + 'static
-{
-}
-
-impl<T, S: FallibleDataSource> DataSrcInitFn<S> for T where
-    T: Fn() -> Result<S, S::Error> + Send + Sync + 'static
-{
-}
+impl<T, S, E> DataSrcInitFn<S, E> for T where T: FnMut() -> Result<S, E> + Send + Sync + 'static {}
 
 /// Count erroneous attempts while quering some data source and perform reinitialization/fallback.
 ///
@@ -43,8 +23,14 @@ impl<T, S: FallibleDataSource> DataSrcInitFn<S> for T where
 ///
 /// Example:
 /// ```rust
-/// fn main() {
+/// use wavesexchange_repos::circuit_breaker::{FallibleDataSource, CircuitBreakerBuilder};
+/// use std::time::Duration;
+///
+/// #[tokio::main]
+/// async fn main() {
 ///     struct Repo;
+///
+///     #[derive(Debug)]
 ///     struct RepoError;
 ///
 ///     impl FallibleDataSource for Repo {
@@ -55,39 +41,40 @@ impl<T, S: FallibleDataSource> DataSrcInitFn<S> for T where
 ///         }
 ///     }
 ///
-///     let cb = CircuitBreaker::builder()
-///         .with_max_timespan(Duration::from_secs(1))
-///         .with_max_err_count_per_timespan(5)
-///         .with_init_fn(|| Ok(Repo));
+///     let cb = CircuitBreakerBuilder {
+///         max_timespan: Duration::from_secs(1),
+///         max_err_count_per_timespan: 5,
+///         init_fn: Box::new(|| Ok(Repo))
+///     }.build().unwrap();
 ///
-///     cb.query(|src| async move { Err(RepoError) }).unwrap_err()
-///     cb.query(|src| async move { Ok(()) }).unwrap()
+///     cb.query(|src| async move { Err::<(), _>(RepoError) }).await.unwrap_err();
+///     cb.query(|src| async move { Ok(()) }).await.unwrap()
 ///     
 ///     // see CB test for more verbose example
 /// }
 /// ```
-pub struct CircuitBreaker<S: FallibleDataSource> {
+pub struct CircuitBreaker<S, E> {
     /// Timespan that errors will be counted in.
     /// After it elapsed, error counter will be resetted.
     max_timespan: Duration,
 
     /// Maximum error count per timespan. Example: 3 errors per 1 sec (max_timespan)
-    max_err_count_per_timespan: usize,
-
-    /// A function that may be called on every fail to reinitialize data source
-    init_fn: Box<dyn DataSrcInitFn<S>>,
+    max_err_count_per_timespan: u16,
 
     /// Current state of CB
-    state: RwLock<CBState<S>>,
+    state: RwLock<CBState<S, E>>,
 }
 
-struct CBState<S: FallibleDataSource> {
+struct CBState<S, E> {
     data_source: Arc<S>,
-    err_count: usize,
+    err_count: u16,
     first_err_ts: Option<Instant>,
+
+    /// A function that may be called on every fail to reinitialize data source
+    init_fn: Box<dyn DataSrcInitFn<S, E>>,
 }
 
-impl<S: FallibleDataSource> CBState<S> {
+impl<S, E> CBState<S, E> {
     fn inc(&mut self) {
         self.err_count += 1;
     }
@@ -97,91 +84,48 @@ impl<S: FallibleDataSource> CBState<S> {
         self.first_err_ts = None;
     }
 
-    fn reinit(&mut self, src: S) {
-        self.data_source = Arc::new(src);
+    fn reinit(&mut self) -> Result<(), E> {
+        self.data_source = Arc::new((self.init_fn)()?);
+        Ok(())
     }
 }
 
-pub struct CircuitBreakerBuilder<S: FallibleDataSource> {
-    max_timespan: Option<Duration>,
-    max_err_count_per_timespan: Option<usize>,
-    init_fn: Option<Box<dyn DataSrcInitFn<S>>>,
+pub struct CircuitBreakerBuilder<S, E> {
+    pub max_timespan: Duration,
+    pub max_err_count_per_timespan: u16,
+    pub init_fn: Box<dyn DataSrcInitFn<S, E>>,
 }
 
-impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
-    pub fn new() -> CircuitBreakerBuilder<S> {
-        CircuitBreakerBuilder {
-            max_timespan: None,
-            max_err_count_per_timespan: None,
-            init_fn: None,
-        }
-    }
-
-    pub fn with_max_timespan(mut self, ts: Duration) -> CircuitBreakerBuilder<S> {
-        self.max_timespan = Some(ts);
-        self
-    }
-
-    pub fn with_max_err_count_per_timespan(mut self, count: usize) -> CircuitBreakerBuilder<S> {
-        self.max_err_count_per_timespan = Some(count);
-        self
-    }
-
-    pub fn with_init_fn(mut self, f: impl DataSrcInitFn<S>) -> CircuitBreakerBuilder<S> {
-        self.init_fn = Some(Box::new(f));
-        self
-    }
-
-    /// Build the circuit breaker.
-    /// Note: you should set up all 3 fields within this builder, either it will panic
-    pub fn build(self) -> Result<CircuitBreaker<S>, S::Error> {
-        // probably there is a better way to force use all with_* methods on builder
-        if self.max_err_count_per_timespan.is_none() {
-            panic!("max_err_count_per_timespan is not set");
-        }
-
-        if self.max_timespan.is_none() {
-            panic!("max_timespan is not set");
-        }
-
-        if self.init_fn.is_none() {
-            panic!("init_fn is not set");
-        }
-
-        let init_fn = self.init_fn.unwrap();
+impl<S, E> CircuitBreakerBuilder<S, E> {
+    pub fn build(self) -> Result<CircuitBreaker<S, E>, E> {
+        let Self {
+            max_timespan,
+            max_err_count_per_timespan,
+            mut init_fn,
+        } = self;
 
         Ok(CircuitBreaker {
             state: RwLock::new(CBState {
                 data_source: Arc::new(init_fn()?),
                 err_count: 0,
                 first_err_ts: None,
+                init_fn,
             }),
-            max_timespan: self.max_timespan.unwrap(),
-            max_err_count_per_timespan: self.max_err_count_per_timespan.unwrap(),
-            init_fn,
+            max_timespan,
+            max_err_count_per_timespan,
         })
     }
 }
 
-impl<S: FallibleDataSource> CircuitBreaker<S> {
-    pub fn builder() -> CircuitBreakerBuilder<S> {
-        CircuitBreakerBuilder::new()
-    }
-
-    pub fn builder_from_cfg(cfg: &Config) -> CircuitBreakerBuilder<S> {
-        Self::builder()
-            .with_max_err_count_per_timespan(cfg.max_err_count_per_timespan)
-            .with_max_timespan(cfg.max_timespan)
-    }
-
+impl<S, E> CircuitBreaker<S, E> {
     /// Query the data source. If succeeded, CB resets internal error counter.
     /// If error returned, counter increases.
     /// If (N > max_err_count_per_timespan) errors appeared, CB is falling back (panic as default).
     /// If not enough errors in a timespan appeared to trigger CB's fallback, error counter will be reset.
-    pub async fn query<T, F, Fut>(&self, query_fn: F) -> Result<T, S::Error>
+    pub async fn query<T, F, Fut>(&self, query_fn: F) -> Result<T, CBError<E>>
     where
         F: FnOnce(Arc<S>) -> Fut,
-        Fut: Future<Output = Result<T, S::Error>>,
+        Fut: Future<Output = Result<T, E>>,
     {
         let state_read_lock = self.state.read().await;
         let result = query_fn(state_read_lock.data_source.clone()).await;
@@ -189,38 +133,37 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
 
         drop(state_read_lock);
 
-        if let Err(e) = &result {
-            if S::is_countable_err(e) {
-                let mut state = self.state.write().await;
-                state.inc();
+        if let Err(_) = &result {
+            let mut state = self.state.write().await;
+            state.inc();
 
-                debug!("err count: {}", state.err_count);
+            debug!("err count: {}", state.err_count);
 
-                match state.first_err_ts {
-                    Some(ts) => {
-                        let elapsed = ts.elapsed();
+            match state.first_err_ts {
+                Some(ts) => {
+                    let elapsed = ts.elapsed();
 
-                        if state.err_count <= self.max_err_count_per_timespan {
-                            if elapsed > self.max_timespan {
-                                state.reset();
-                            }
-                        } else {
-                            return Err(state
-                                .data_source
-                                .fallback(elapsed.as_millis(), state.err_count));
+                    if state.err_count <= self.max_err_count_per_timespan {
+                        if elapsed > self.max_timespan {
+                            state.reset();
                         }
+                    } else {
+                        return Err(CBError::CircuitBroke {
+                            err_count: state.err_count,
+                            elapsed,
+                        });
                     }
-                    None => state.first_err_ts = Some(Instant::now()),
                 }
-                state.reinit((self.init_fn)()?);
+                None => state.first_err_ts = Some(Instant::now()),
             }
+            state.reinit().map_err(CBError::Inner)?;
         } else {
             if old_err_count > 0 {
                 let mut state = self.state.write().await;
                 state.reset();
             }
         }
-        result
+        result.map_err(CBError::Inner)
     }
 }
 
@@ -232,46 +175,32 @@ mod tests {
 
     impl WildErrorGenerator {
         fn err(&self) -> Result<(), WildError> {
-            Err(WildError::Inner)
+            Err(WildError)
         }
     }
 
     #[derive(Debug)]
-    enum WildError {
-        Inner,
-        CircuitBreakerTriggered,
-    }
-
-    impl FallibleDataSource for WildErrorGenerator {
-        type Error = WildError;
-
-        fn is_countable_err(err: &Self::Error) -> bool {
-            matches!(err, WildError::Inner)
-        }
-
-        fn fallback(&self, _elapsed_ms: u128, _err_count: usize) -> Self::Error {
-            WildError::CircuitBreakerTriggered
-        }
-    }
+    struct WildError;
 
     #[tokio::test]
     async fn circuit_breaker() {
-        let cb = CircuitBreaker::builder()
-            .with_max_timespan(Duration::from_secs(1))
-            .with_max_err_count_per_timespan(2)
-            .with_init_fn(|| Ok(WildErrorGenerator))
-            .build()
-            .unwrap();
+        let cb = CircuitBreakerBuilder {
+            max_timespan: Duration::from_secs(1),
+            max_err_count_per_timespan: 2,
+            init_fn: Box::new(|| Ok(WildErrorGenerator)),
+        }
+        .build()
+        .unwrap();
 
         // trigger 2 errors in cb
         assert!(matches!(
             cb.query(|weg| async move { weg.err() }).await.unwrap_err(),
-            WildError::Inner
+            CBError::Inner(WildError)
         ));
 
         assert!(matches!(
             cb.query(|weg| async move { weg.err() }).await.unwrap_err(),
-            WildError::Inner
+            CBError::Inner(WildError)
         ));
 
         // reset cb state with successful query
@@ -280,18 +209,18 @@ mod tests {
         // trigger 3 errors in cb (max errors limit exceeded)
         assert!(matches!(
             cb.query(|weg| async move { weg.err() }).await.unwrap_err(),
-            WildError::Inner
+            CBError::Inner(WildError)
         ));
 
         assert!(matches!(
             cb.query(|weg| async move { weg.err() }).await.unwrap_err(),
-            WildError::Inner
+            CBError::Inner(WildError)
         ));
 
         // cb fallback
         assert!(matches!(
             cb.query(|weg| async move { weg.err() }).await.unwrap_err(),
-            WildError::CircuitBreakerTriggered
+            CBError::CircuitBroke { .. }
         ));
 
         assert_eq!(cb.query(|_weg| async move { Ok(()) }).await.unwrap(), ());
