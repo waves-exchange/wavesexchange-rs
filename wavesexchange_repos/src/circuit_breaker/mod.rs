@@ -82,6 +82,15 @@ impl<S, E> CBState<S, E> {
     }
 }
 
+/// A circuit breaker builder. As all fields are mandatory, use struct creation syntax to init.
+/// Example:
+/// ```no_compile
+/// CircuitBreakerBuilder {
+///     max_timespan: Duration::from_secs(1),
+///     max_err_count_per_timespan: 5,
+///     init_fn: Box::new(|| Ok(Repo))
+/// }.build().unwrap()
+/// ```
 pub struct CircuitBreakerBuilder<S, E> {
     pub max_timespan: Duration,
     pub max_err_count_per_timespan: u16,
