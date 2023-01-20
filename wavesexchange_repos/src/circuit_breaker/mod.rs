@@ -185,6 +185,7 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
     {
         let state_read_lock = self.state.read().await;
         let result = query_fn(state_read_lock.data_source.clone()).await;
+        let old_err_count = state_read_lock.err_count;
 
         drop(state_read_lock);
 
@@ -214,8 +215,10 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
                 state.reinit((self.init_fn)()?);
             }
         } else {
-            let mut state = self.state.write().await;
-            state.reset();
+            if old_err_count > 0 {
+                let mut state = self.state.write().await;
+                state.reset();
+            }
         }
         result
     }
