@@ -10,7 +10,7 @@ use wavesexchange_log::debug;
 use std::{
     future::Future,
     mem::drop,
-    sync::Arc,
+    rc::Rc,
     time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
@@ -60,7 +60,7 @@ pub struct CircuitBreaker<S, E> {
 }
 
 struct CBState<S, E> {
-    data_source: Arc<S>,
+    data_source: Rc<S>,
     err_count: u16,
     first_err_ts: Option<Instant>,
 
@@ -79,7 +79,7 @@ impl<S, E> CBState<S, E> {
     }
 
     fn reinit(&mut self) -> Result<(), E> {
-        self.data_source = Arc::new((self.init_fn)()?);
+        self.data_source = Rc::new((self.init_fn)()?);
         Ok(())
     }
 }
@@ -109,7 +109,7 @@ impl<S, E> CircuitBreakerBuilder<S, E> {
 
         Ok(CircuitBreaker {
             state: RwLock::new(CBState {
-                data_source: Arc::new(init_fn()?),
+                data_source: Rc::new(init_fn()?),
                 err_count: 0,
                 first_err_ts: None,
                 init_fn,
@@ -127,7 +127,7 @@ impl<S, E> CircuitBreaker<S, E> {
     /// If not enough errors in a timespan appeared to trigger CB's fallback, error counter will be reset.
     pub async fn query<T, F, Fut>(&self, query_fn: F) -> Result<T, CBError<E>>
     where
-        F: FnOnce(Arc<S>) -> Fut,
+        F: FnOnce(Rc<S>) -> Fut,
         Fut: Future<Output = Result<T, E>>,
     {
         let state_read_lock = self.state.read().await;
