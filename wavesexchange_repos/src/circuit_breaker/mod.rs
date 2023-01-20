@@ -11,11 +11,15 @@ use std::{
 };
 use tokio::sync::RwLock;
 
+/// A trait represents some data source that can fail.
+/// Must be implemented for a struct that used in circuit breaker.
 pub trait FallibleDataSource {
     type Error;
 
+    /// Shows if error will increase CB's counter
     fn is_countable_err(err: &Self::Error) -> bool;
 
+    /// Set up CB's behaviour after maximum errors limit exceeded
     fn fallback(&self, elapsed_ms: u128, err_count: usize) -> Self::Error {
         panic!(
             "CircuitBreaker panicked after {err_count} errors in a row happened in {elapsed_ms}ms"
@@ -33,10 +37,47 @@ impl<T, S: FallibleDataSource> DataSrcInitFn<S> for T where
 {
 }
 
+/// Count erroneous attempts while quering some data source and perform reinitialization/fallback.
+///
+/// To use within an object, you must implement `FallibleDataSource` first.
+///
+/// Example:
+/// ```rust
+/// fn main() {
+///     struct Repo;
+///     struct RepoError;
+///
+///     impl FallibleDataSource for Repo {
+///         type Error = RepoError;
+///
+///         fn is_countable_err(err: &Self::Error) -> bool {
+///             true
+///         }
+///     }
+///
+///     let cb = CircuitBreaker::builder()
+///         .with_max_timespan(Duration::from_secs(1))
+///         .with_max_err_count_per_timespan(5)
+///         .with_init_fn(|| Ok(Repo));
+///
+///     cb.query(|src| async move { Err(RepoError) }).unwrap_err()
+///     cb.query(|src| async move { Ok(()) }).unwrap()
+///     
+///     // see CB test for more verbose example
+/// }
+/// ```
 pub struct CircuitBreaker<S: FallibleDataSource> {
+    /// Timespan that errors will be counted in.
+    /// After it elapsed, error counter will be resetted.
     max_timespan: Duration,
+
+    /// Maximum error count per timespan. Example: 3 errors per 1 sec (max_timespan)
     max_err_count_per_timespan: usize,
+
+    /// A function that may be called on every fail to reinitialize data source
     init_fn: Box<dyn DataSrcInitFn<S>>,
+
+    /// Current state of CB
     state: RwLock<CBState<S>>,
 }
 
@@ -91,6 +132,8 @@ impl<S: FallibleDataSource> CircuitBreakerBuilder<S> {
         self
     }
 
+    /// Build the circuit breaker.
+    /// Note: you should set up all 3 fields within this builder, either it will panic
     pub fn build(self) -> Result<CircuitBreaker<S>, S::Error> {
         // probably there is a better way to force use all with_* methods on builder
         if self.max_err_count_per_timespan.is_none() {
@@ -131,6 +174,10 @@ impl<S: FallibleDataSource> CircuitBreaker<S> {
             .with_max_timespan(cfg.max_timespan)
     }
 
+    /// Query the data source. If succeeded, CB resets internal error counter.
+    /// If error returned, counter increases.
+    /// If (N > max_err_count_per_timespan) errors appeared, CB is falling back (panic as default).
+    /// If not enough errors in a timespan appeared to trigger CB's fallback, error counter will be reset.
     pub async fn query<T, F, Fut>(&self, query_fn: F) -> Result<T, S::Error>
     where
         F: FnOnce(Arc<S>) -> Fut,
