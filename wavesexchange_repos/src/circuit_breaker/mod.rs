@@ -23,7 +23,7 @@ impl<T, S, E> DataSrcInitFn<S, E> for T where T: FnMut() -> Result<S, E> + Send 
 ///
 /// Example:
 /// ```rust
-/// use wavesexchange_repos::circuit_breaker::{FallibleDataSource, CircuitBreakerBuilder};
+/// use wavesexchange_repos::circuit_breaker::CircuitBreakerBuilder;
 /// use std::time::Duration;
 ///
 /// #[tokio::main]
@@ -32,14 +32,6 @@ impl<T, S, E> DataSrcInitFn<S, E> for T where T: FnMut() -> Result<S, E> + Send 
 ///
 ///     #[derive(Debug)]
 ///     struct RepoError;
-///
-///     impl FallibleDataSource for Repo {
-///         type Error = RepoError;
-///
-///         fn is_countable_err(err: &Self::Error) -> bool {
-///             true
-///         }
-///     }
 ///
 ///     let cb = CircuitBreakerBuilder {
 ///         max_timespan: Duration::from_secs(1),
