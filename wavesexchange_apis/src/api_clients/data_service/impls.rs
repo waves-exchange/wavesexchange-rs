@@ -116,12 +116,15 @@ impl HttpClient<DataService> {
             .await
     }
 
+    //TODO The following method became really ugly. Replace with some sort of builder.
+
     //TODO Why this fn returns `dto::ExchangeTransaction`
     // while similar fn `last_exchange_transaction_to_date` returns `dto::GenericTransactionResponse`?
     // Is there a real reason for it?
     pub async fn transactions_exchange(
         &self,
         sender: Option<impl AsRef<str>>,
+        matcher: Option<impl AsRef<str>>,
         amount_asset_id: Option<impl AsRef<str>>,
         price_asset_id: Option<impl AsRef<str>>,
         time_start: Option<DateTime<Utc>>,
@@ -134,6 +137,7 @@ impl HttpClient<DataService> {
             amount_asset: amount_asset_id.map(|id| id.as_ref().to_owned()),
             price_asset: price_asset_id.map(|id| id.as_ref().to_owned()),
             sender: sender.map(|id| id.as_ref().to_owned()),
+            matcher: matcher.map(|id| id.as_ref().to_owned()),
             time_start,
             time_end,
             sort,

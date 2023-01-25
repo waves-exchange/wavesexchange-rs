@@ -93,6 +93,7 @@ async fn get_exchange_transactions() {
     let txs_resp = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
         .transactions_exchange(
             Option::<String>::None,
+            Option::<String>::None,
             Some(WAVES),
             Some(USDN_ASSET_ID),
             Some(date1),

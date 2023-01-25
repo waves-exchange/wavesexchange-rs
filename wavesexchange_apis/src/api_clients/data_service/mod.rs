@@ -107,6 +107,7 @@ pub mod dto {
         pub amount_asset: Option<String>,
         pub price_asset: Option<String>,
         pub sender: Option<String>,
+        pub matcher: Option<String>,
         pub time_start: Option<DateTime<Utc>>,
         pub time_end: Option<DateTime<Utc>>,
         pub sort: Sort,
