@@ -1,6 +1,6 @@
 [package]
 name = "wavesexchange_topic"
-version = "0.4.1"
+version = "0.4.2"
 authors = [
     "Alexander Tuktarov <ATuktarov@web3tech.ru>",
     "Alex Kordys <akordys@web3tech.ru>",
