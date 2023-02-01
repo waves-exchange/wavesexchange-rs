@@ -10,7 +10,7 @@ edition = "2018"
 [dependencies]
 percent-encoding = "2"
 serde = { version = "1", features = ["derive"] }
-serde_qs = "0.10"
+serde_qs = "0.11"
 thiserror = "1"
 url = "2"
 
