@@ -5,7 +5,6 @@ edition = "2021"
 authors = ["Artem Sidorenko <kronos44_0@mail.ru>"]
 
 [dependencies]
-async-recursion = "1"
 base64 = "0.21"
 # Using bigdecimal which is compatible with diesel: Diesel 1.x requires 0.1, Diesel 2.x can use up to 0.3
 bigdecimal = { version = ">=0.0.13, < 0.4.0", features = ["serde"] }

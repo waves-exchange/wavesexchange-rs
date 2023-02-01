@@ -1,5 +1,4 @@
 use crate::{ApiResult, BaseApi, HttpClient};
-use async_recursion::async_recursion;
 use wavesexchange_warp::pagination::List;
 
 #[derive(Clone, Debug)]
@@ -8,7 +7,6 @@ pub struct Transfers;
 impl BaseApi for Transfers {}
 
 impl HttpClient<Transfers> {
-    #[async_recursion]
     pub async fn get(
         &self,
         req: dto::SearchTransfersRequest,
