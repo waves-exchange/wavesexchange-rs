@@ -37,7 +37,7 @@ async fn single_asset_price_request() {
                     }
                 ],
                 "values": [
-                    ["3P8qJyxUqizCWWtEn2zsLZVPzZAjdNGppB1", "%s%s__price__UAH"]
+                    ["3P3hCvE9ZfeMnZE6kXzR6YBzxhxM8J6PE7K", "%s%s%d__total__locked__0"]
                 ]
             }
         }
