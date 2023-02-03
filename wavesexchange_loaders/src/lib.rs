@@ -1,23 +1,27 @@
 /*!
-> Combine `dataloader` and `cached` libs.
+Combines `dataloader` and `cached` libs.
 
 `wavesexchange_loaders` provides interfaces to create cached or non-cached dataloaders.
 
 Usage example:
-```rust
-mod define {
-    use wavesexchange_loaders::{CachedLoader, SizedCache};
-    use error::MyBeautifulError;
+```
+mod my_loader {
+    use async_trait::async_trait;
+    use wavesexchange_loaders::{CachedLoader, TimedCache};
 
-    struct SomeLoaderStruct;
+    pub type MyError = ();
 
-    impl CachedLoader<i32, String> for SomeLoaderStruct {
+    #[derive(Clone)]
+    pub struct MyLoader;
+
+    #[async_trait]
+    impl CachedLoader<i32, String> for MyLoader {
         type Cache = TimedCache<i32, String>;
-        type Error = MyBeautifulError;
+        type Error = MyError;
 
         // Note: vec of values and array of keys must have the same size
-        async fn load_fn(&mut self, keys: &[u64]) -> Result<Vec<String>, Self::Error> {
-            Ok(keys.into_iter().map(|k| format!("num: {}", k)).collect())
+        async fn load_fn(&mut self, keys: &[i32]) -> Result<Vec<String>, Self::Error> {
+            Ok(keys.into_iter().map(|k| format!("answer: {}", k)).collect())
         }
 
         // keys will be cached for 3 seconds
@@ -27,19 +31,17 @@ mod define {
     }
 }
 
-mod usage {
-    use super::define::SomeLoaderStruct;
-    use wavesexchange_loaders::{Loader, LoaderError};
+// Usage
+use my_loader::{MyLoader, MyError};
+use wavesexchange_loaders::{Loader, LoaderError};
 
-    fn main() {
-        let s = SomeLoaderStruct {};
-        // result type is listed here just for clarity,
-        // the .load() argument type annotation is enough for compiler to infer other types
-        let result: Result<String, LoaderError<MyBeautifulError>> = s.load(5i32);
-    }
-}
+# tokio_test::block_on(async {
+let s = MyLoader {};
+// result type is specified here just for reference, it can be inferred by the compiler
+let result: Result<String, LoaderError<MyError>> = s.load(42).await;
+assert_eq!(result.ok(), Some("answer: 42".to_string()));
+# })
 ```
-
 */
 
 mod cacher;

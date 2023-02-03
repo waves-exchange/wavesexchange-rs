@@ -62,16 +62,21 @@ type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 /// If no routes provided, instance won't be created.
 ///
 /// Example:
-/// ```rust
-/// let routes = warp::path!("hello").and(warp::get());
+/// ```no_run
+/// # use std::convert::Infallible;
+/// # use wavesexchange_warp::MetricsWarpBuilder;
+/// # use warp::Filter;
+/// # tokio_test::block_on(async {
+/// let routes = warp::path!("hello").and_then(|| async { Ok::<_, Infallible>("Hello, world!") });
 ///
 /// // run only metrics instance on port 8080
-/// MetricsWarpBuilder::new().with_metrics_port(8080).run_blocking().await;
+/// MetricsWarpBuilder::new().with_metrics_port(8080).run_async().await;
 ///
 /// // run two warp instances on ports 8080 (main routes) and 9090 (metrics routes)
 /// // (default port for metrics is main_routes_port + 1010),
-/// // metrics port can be overriden via `with_metrics_port`
-/// MetricsWarpBuilder::new().with_main_routes(routes).with_main_routes_port(8080).run_blocking().await;
+/// // metrics port can be overridden via `with_metrics_port`
+/// MetricsWarpBuilder::new().with_main_routes(routes).with_main_routes_port(8080).run_async().await;
+/// # })
 /// ```
 pub struct MetricsWarpBuilder {
     registry: Registry,
@@ -157,8 +162,15 @@ impl MetricsWarpBuilder {
     /// Register prometheus metric. No need to `Box::new`.
     ///
     /// Note: if metric is created by `lazy_static!` or analogues, deref it first:
-    /// ```rust,no_run
-    /// .with_metric(&*MY_STATIC_METRIC)
+    /// ```no_run
+    /// # use lazy_static::lazy_static;
+    /// # use prometheus::IntCounter;
+    /// # use wavesexchange_warp::MetricsWarpBuilder;
+    /// # let builder = MetricsWarpBuilder::new();
+    /// lazy_static! {
+    ///     static ref MY_STATIC_METRIC: IntCounter = IntCounter::new("...", "...").unwrap();
+    /// }
+    /// builder.with_metric(&*MY_STATIC_METRIC);
     /// ```
     pub fn with_metric<M: Collector + Clone + 'static>(self, metric: &M) -> Self {
         self.registry.register(Box::new(metric.clone())).unwrap();

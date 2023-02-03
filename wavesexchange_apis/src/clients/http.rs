@@ -10,11 +10,14 @@ use wavesexchange_log::debug;
 /// A rust http interface to various waves services (non-exhaustive)
 ///
 /// Usage example:
-/// ```rust,no_run
+/// ```no_run
 /// use wavesexchange_apis::{HttpClient, LiquidityPools};
 ///
+/// # let liquidity_pools_url = "";
+/// # tokio_test::block_on(async {
 /// let client = HttpClient::<LiquidityPools>::from_base_url(liquidity_pools_url);
-/// client.stats().await;
+/// let res = client.stats().await;
+/// # })
 /// ```
 #[derive(Clone, Debug)]
 pub struct HttpClient<A: BaseApi> {
@@ -165,14 +168,21 @@ type StatusHandler<T> = Box<dyn FnOnce(Response) -> BoxFuture<'static, ApiResult
 /// Optional helper struct for handling requests-responses
 ///
 /// ```no_run
-/// HttpClient::create_req_handler(self, self.http_get("search"), "search in my service")
-///      // 200 OK has a default handler, you don't need to set it up explicitly all the time.
-///      // Same for other statuses without explicit handlers (they have another default handler).
-///     .handle_status_code(
-///         StatusCode::NOT_FOUND,
-///         |resp| async { resp.text().await.unwrap_or("not found!") }
-///     )
-///     .execute()
+/// # use wavesexchange_apis::HttpClient;
+/// # use reqwest::StatusCode;
+/// # let http_client = HttpClient::<()>::new();
+/// # tokio_test::block_on(async {
+/// let res =
+///     http_client.create_req_handler(http_client.http_get("search"), "search in my service")
+///         // 200 OK has a default handler, you don't need to set it up explicitly all the time.
+///         // Same for other statuses without explicit handlers (they have another default handler).
+///         .handle_status_code(
+///             StatusCode::NOT_FOUND,
+///             |resp| async { Ok(resp.text().await.unwrap_or("not found!".to_string())) }
+///         )
+///         .execute()
+///         .await;
+/// # })
 /// ```
 pub struct WXRequestHandler<'cli, A, T>
 where

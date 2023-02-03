@@ -16,5 +16,6 @@ warp = "0.3"
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "time"] }
 reqwest = "0.11"
+tokio = { version = "1", features = ["macros", "time"] }
+tokio-test = "0.4"
