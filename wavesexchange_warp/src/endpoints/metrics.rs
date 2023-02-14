@@ -5,7 +5,7 @@ use super::{
 use futures::future::{join, BoxFuture, FutureExt};
 use lazy_static::lazy_static;
 use prometheus::{core::Collector, HistogramOpts, HistogramVec, IntCounter, Registry, TextEncoder};
-use std::{fmt::Debug, future::Future};
+use std::{env, fmt::Debug, future::Future};
 use warp::{filters::BoxedFilter, log::Info, Filter, Rejection, Reply};
 
 lazy_static! {
@@ -20,6 +20,7 @@ lazy_static! {
 
 pub const DEFAULT_MAIN_ROUTES_PORT: u16 = 8080;
 pub const DEFAULT_METRICS_PORT_OFFSET: u16 = 1010;
+pub const METRICS_PORT_ENV: &str = "METRICS_PORT";
 
 pub trait SharedFilter<R, E: Into<Rejection> = Rejection>:
     Filter<Extract = (R,), Error = E> + Clone + Shared
@@ -76,6 +77,9 @@ type DeepBoxedFilter<R = Box<dyn Reply>> = BoxedFilter<(R,)>;
 /// // (default port for metrics is main_routes_port + 1010),
 /// // metrics port can be overridden via `with_metrics_port`
 /// MetricsWarpBuilder::new().with_main_routes(routes).with_main_routes_port(8080).run_async().await;
+///
+/// // run only metrics instance on port defined in the METRICS_PORT env variable
+/// MetricsWarpBuilder::new().with_metrics_port_from_env().run_async().await;
 /// # })
 /// ```
 pub struct MetricsWarpBuilder {
@@ -117,15 +121,25 @@ impl MetricsWarpBuilder {
         self
     }
 
-    /// Define custom port of main instance.
+    /// Define port number of main web-server instance.
     pub fn with_main_routes_port(mut self, port: u16) -> Self {
         self.main_routes_port = Some(port);
         self
     }
 
-    /// Define custom port of metrics instance.
+    /// Define port number of the metrics web-server instance.
     pub fn with_metrics_port(mut self, port: u16) -> Self {
         self.metrics_port = Some(port);
+        self
+    }
+
+    /// Use `METRICS_PORT` env variable as the port number of the metrics web-server instance, if set.
+    /// If the env variable is not set, use default port number which is the main port number + 1010.
+    pub fn with_metrics_port_from_env(mut self) -> Self {
+        self.metrics_port = env::var(METRICS_PORT_ENV)
+            .ok()
+            .map(|s| s.parse::<u16>().ok())
+            .flatten();
         self
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "wavesexchange_warp"
-version = "0.14.4"
+version = "0.14.5"
 authors = ["Dmitry Shuranov <dvshur@gmail.com>"]
 edition = "2021"
 
