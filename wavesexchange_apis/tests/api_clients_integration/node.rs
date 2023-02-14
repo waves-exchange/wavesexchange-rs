@@ -1,6 +1,7 @@
 use crate::common::{MAINNET, TESTNET};
 use wavesexchange_apis::{models::dto::DataEntry, node::dto, HttpClient, Node};
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn data_entries() {
     let keys: Vec<String> = ["UAH", "EUR", "CNY", "JPY", "RUB", "NGN"]
@@ -20,6 +21,7 @@ async fn data_entries() {
     );
 }
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn evaluate() {
     let result = HttpClient::<Node>::from_base_url(TESTNET::node_url)

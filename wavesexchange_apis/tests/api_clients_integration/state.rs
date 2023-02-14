@@ -2,6 +2,7 @@ use crate::common::{MAINNET, TESTNET};
 use serde_json::json;
 use wavesexchange_apis::{HttpClient, StateService};
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn test_get_state() {
     let client = HttpClient::<StateService>::from_base_url(TESTNET::state_service_url);
@@ -23,6 +24,7 @@ async fn test_get_state() {
     assert!(entries_none.is_none());
 }
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn single_asset_price_request() {
     let query = json!({
@@ -51,6 +53,7 @@ async fn single_asset_price_request() {
     assert_eq!(entries.items.len(), 1);
 }
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn defo_assets_list() {
     let query = json!({

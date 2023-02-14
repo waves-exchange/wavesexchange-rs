@@ -7,6 +7,7 @@ const BTC: &str = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS";
 const NON_TRADABLE_ASSET: &str = "Ej5j5kr1hA4MmdKnewGgG7tJbiHFzotU2x2LELzHjW4o";
 const USDN_ASSET_ID: &str = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p";
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn fetch_rates_batch_from_data_service() {
     let rates = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
@@ -24,6 +25,7 @@ async fn fetch_rates_batch_from_data_service() {
     assert!(rates[1].data.rate == 0.0);
 }
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn fetch_invokes_control_contract_finalize_current_price_v2() {
     // example invoke TS: 2021-06-21T16:38:52
@@ -73,6 +75,7 @@ async fn fetch_invokes_control_contract_finalize_current_price_v2() {
     }
 }
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn get_exchange_transactions() {
     let date1 = DateTime::from_utc(

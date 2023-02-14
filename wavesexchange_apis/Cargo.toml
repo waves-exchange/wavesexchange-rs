@@ -26,3 +26,4 @@ wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs
 
 [dev-dependencies]
 tokio-test = "0.4"
+test-with = { version = "0.9", default-features = false, features = [] }

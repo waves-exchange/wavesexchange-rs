@@ -1,6 +1,7 @@
 use crate::common::MAINNET;
 use wavesexchange_apis::{assets::dto, AssetsService, HttpClient};
 
+#[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn test_assets_get() {
     let resp = HttpClient::<AssetsService>::from_base_url(MAINNET::assets_service_url)
