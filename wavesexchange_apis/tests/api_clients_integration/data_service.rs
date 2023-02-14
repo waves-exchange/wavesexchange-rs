@@ -1,4 +1,3 @@
-use crate::common::MAINNET;
 use chrono::{DateTime, NaiveDate, Utc};
 use wavesexchange_apis::{data_service::dto, DataService, HttpClient};
 
@@ -6,13 +5,16 @@ const WAVES: &str = "WAVES";
 const BTC: &str = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS";
 const NON_TRADABLE_ASSET: &str = "Ej5j5kr1hA4MmdKnewGgG7tJbiHFzotU2x2LELzHjW4o";
 const USDN_ASSET_ID: &str = "DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p";
+const MAINNET_DATA_SERVICE_URL: &str = "https://waves.exchange/api/v1/forward/data_service/v0";
 
 #[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn fetch_rates_batch_from_data_service() {
-    let rates = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
+    let matcher = "3PEjHv3JGjcWNpYEEkif2w8NXV4kbhnoGgu";
+
+    let rates = HttpClient::<DataService>::from_base_url(MAINNET_DATA_SERVICE_URL)
         .rates(
-            MAINNET::matcher,
+            matcher,
             vec![(WAVES, BTC), (NON_TRADABLE_ASSET, WAVES)],
             None,
         )
@@ -34,12 +36,14 @@ async fn fetch_invokes_control_contract_finalize_current_price_v2() {
         .and_hms_opt(16, 38, 53)
         .unwrap();
 
-    let invokes = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
+    let defo_control_contract = "3P8qJyxUqizCWWtEn2zsLZVPzZAjdNGppB1";
+
+    let invokes = HttpClient::<DataService>::from_base_url(MAINNET_DATA_SERVICE_URL)
         .invoke_script_transactions(
             None::<Vec<String>>,
             None,
             Some(timestamp_lt),
-            Some(MAINNET::defo_control_contract),
+            Some(defo_control_contract),
             Some("finalizeCurrentPriceV2"),
             None::<String>,
             Some(dto::Sort::Desc),
@@ -93,7 +97,7 @@ async fn get_exchange_transactions() {
         Utc,
     );
 
-    let txs_resp = HttpClient::<DataService>::from_base_url(MAINNET::data_service_url)
+    let txs_resp = HttpClient::<DataService>::from_base_url(MAINNET_DATA_SERVICE_URL)
         .transactions_exchange(
             Option::<String>::None,
             Option::<String>::None,

@@ -1,5 +1,7 @@
-use crate::common::{MAINNET, TESTNET};
 use wavesexchange_apis::{models::dto::DataEntry, node::dto, HttpClient, Node};
+
+const MAINNET_NODE_URL: &str = "https://nodes.waves.exchange";
+const TESTNET_NODE_URL: &str = "https://nodes-testnet.wavesnodes.com";
 
 #[test_with::env(INTEGRATION)]
 #[tokio::test]
@@ -9,8 +11,10 @@ async fn data_entries() {
         .map(|sym| format!("%s%s__price__{}", sym))
         .collect();
 
-    let mut data_entries = HttpClient::<Node>::from_base_url(MAINNET::node_url)
-        .data_entries(MAINNET::defo_control_contract, keys)
+    let defo_control_contract = "3P8qJyxUqizCWWtEn2zsLZVPzZAjdNGppB1";
+
+    let mut data_entries = HttpClient::<Node>::from_base_url(MAINNET_NODE_URL)
+        .data_entries(defo_control_contract, keys)
         .await
         .unwrap();
 
@@ -24,9 +28,11 @@ async fn data_entries() {
 #[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn evaluate() {
-    let result = HttpClient::<Node>::from_base_url(TESTNET::node_url)
+    let any_stake_contract_address = "3Mzt645zA6u2QG6jRPoo6H6CK89kVggFgNi";
+
+    let result = HttpClient::<Node>::from_base_url(TESTNET_NODE_URL)
         .evaluate(
-            &TESTNET::products[0].contract_address,
+            any_stake_contract_address,
             "privateCurrentSysParamsREST(\"5Sh9KghfkZyhjwuodovDhB6PghDUGBHiAPZ4MkrPgKtX\")",
         )
         .await

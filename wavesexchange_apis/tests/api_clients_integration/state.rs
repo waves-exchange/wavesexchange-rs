@@ -1,11 +1,13 @@
-use crate::common::{MAINNET, TESTNET};
 use serde_json::json;
 use wavesexchange_apis::{HttpClient, StateService};
+
+const MAINNET_STATE_SERVICE_URL: &str = "https://waves.exchange/api/v1/state";
+const TESTNET_STATE_SERVICE_URL: &str = "https://testnet.waves.exchange/api/v1/state";
 
 #[test_with::env(INTEGRATION)]
 #[tokio::test]
 async fn test_get_state() {
-    let client = HttpClient::<StateService>::from_base_url(TESTNET::state_service_url);
+    let client = HttpClient::<StateService>::from_base_url(TESTNET_STATE_SERVICE_URL);
     let entries = client
         .entries(
             "3MrbnZkriTBZhRqS45L1VfCrden6Erpa7To",
@@ -45,7 +47,7 @@ async fn single_asset_price_request() {
         }
     });
 
-    let entries = HttpClient::<StateService>::from_base_url(MAINNET::state_service_url)
+    let entries = HttpClient::<StateService>::from_base_url(MAINNET_STATE_SERVICE_URL)
         .search(query, None, None)
         .await
         .unwrap();
@@ -84,7 +86,7 @@ async fn defo_assets_list() {
         }
     });
 
-    let entries = HttpClient::<StateService>::from_base_url(MAINNET::state_service_url)
+    let entries = HttpClient::<StateService>::from_base_url(MAINNET_STATE_SERVICE_URL)
         .search(query, None, None)
         .await
         .unwrap();

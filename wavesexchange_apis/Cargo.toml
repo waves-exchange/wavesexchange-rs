@@ -23,6 +23,5 @@ wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs"
 wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.5" }
 
 [dev-dependencies]
-once_cell = "1"
 tokio-test = "0.4"
 test-with = { version = "0.9", default-features = false, features = [] }
