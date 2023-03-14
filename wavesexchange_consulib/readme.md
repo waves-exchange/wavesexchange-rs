@@ -89,22 +89,3 @@ impl ConsumerConfig {
 Возможна замена дизеля на sqlx, поскольку с усложнением sql-запросов в ORM возрастает когнитивная нагрузка, сообщения об ошибках типов дизеля становятся километровыми и малопонятными. Sqlx же позволяет писать на обычном sql, синтаксис которого проверяется в компайл-тайме с помощью макросов, а также десериализовывать результаты запроса сразу в нужные структуры вместо кортежей.
 
 Для использования таких макросов в IDE или в `.env` должна быть поднята БД с миграциями и установлена энва `DATABASE_URL`.
-
-# notes
-## asset-search-consumer
-
-## data-service-consumer
-
-## balances-consumer
-no superseded_by
-
-## investments-consumer
-
-## liquidity-pools-consumer
-
-## operations-consumer
-
-## state-consumer
-
-## transfer-consumer
-no superseded_by
