@@ -6,5 +6,5 @@ members = [
     "wavesexchange_topic",
     "wavesexchange_loaders",
     "wavesexchange_apis",
-    "wavesexchange_repos",
+    "wavesexchange_utils",
 ]
