@@ -126,6 +126,7 @@ impl HttpClient<Node> {
 }
 
 pub mod dto {
+    use crate::models::dto::{DataEntryValue, TypeError};
     use bigdecimal::BigDecimal;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
@@ -156,6 +157,10 @@ pub mod dto {
         // todo other types
     }
 
+    #[derive(Clone, Debug, thiserror::Error)]
+    #[error("Expected tuple of {0} elements, missing key '_{1}'")]
+    pub struct TupleError(u8, u8);
+
     #[derive(Debug, Clone, Deserialize)]
     pub struct LastHeight {
         pub height: i32,
@@ -165,6 +170,10 @@ pub mod dto {
     pub(super) struct StateRequest {
         pub keys: Vec<String>,
     }
+
+    //TODO Most likely this `DataEntryResponse` needs to be merged with `models::dto::DataEntryValue`
+    // or at least be convertable to it.
+    // Need to make a convenient API here - separate key (which is just repeated in every branch of the enum) from value etc.
 
     #[derive(Debug, Deserialize, Clone)]
     #[serde(tag = "type")]
@@ -268,5 +277,93 @@ pub mod dto {
         #[serde(rename = "string")]
         String { value: String },
         // todo rest of them
+    }
+
+    impl DataEntryResponse {
+        #[inline]
+        pub fn key(&self) -> &str {
+            match self {
+                DataEntryResponse::String { key, .. }
+                | DataEntryResponse::Integer { key, .. }
+                | DataEntryResponse::Boolean { key, .. }
+                | DataEntryResponse::Binary { key, .. } => key.as_str(),
+            }
+        }
+
+        #[inline]
+        pub fn into_value(self) -> DataEntryValue {
+            match self {
+                DataEntryResponse::String { value, .. } => DataEntryValue::String(value),
+                DataEntryResponse::Integer { value, .. } => DataEntryValue::Integer(value),
+                DataEntryResponse::Boolean { value, .. } => DataEntryValue::Boolean(value),
+                DataEntryResponse::Binary { value, .. } => DataEntryValue::Binary(value),
+            }
+        }
+    }
+
+    impl Value {
+        #[inline]
+        pub fn try_as_array(&self) -> Result<&[Value], TypeError> {
+            match self {
+                Value::Array { value } => Ok(value.as_slice()),
+                _ => Err(self.type_error("Array")),
+            }
+        }
+
+        #[inline]
+        pub fn try_into_tuple_2(self) -> Result<Result<(Value, Value), TupleError>, TypeError> {
+            match self {
+                Value::Tuple { value } => Ok(Self::hash_map_into_tuple_2(value)),
+                _ => Err(self.type_error("Tuple")),
+            }
+        }
+
+        fn hash_map_into_tuple_2(
+            mut map: HashMap<String, Value>,
+        ) -> Result<(Value, Value), TupleError> {
+            let v1 = map.remove("_1").ok_or_else(|| TupleError(2, 1))?;
+            let v2 = map.remove("_2").ok_or_else(|| TupleError(2, 1))?;
+            Ok((v1, v2))
+        }
+
+        #[inline]
+        pub fn try_as_str(&self) -> Result<&str, TypeError> {
+            match self {
+                Value::String { value } => Ok(value.as_str()),
+                _ => Err(self.type_error("String")),
+            }
+        }
+
+        #[inline]
+        pub fn try_into_string(self) -> Result<String, TypeError> {
+            match self {
+                Value::String { value } => Ok(value),
+                _ => Err(self.type_error("String")),
+            }
+        }
+
+        #[inline]
+        pub fn try_as_int(&self) -> Result<i64, TypeError> {
+            match self {
+                Value::Int { value } => Ok(*value),
+                _ => Err(self.type_error("Int")),
+            }
+        }
+
+        #[inline]
+        pub fn value_type_name(&self) -> &'static str {
+            match self {
+                Value::Array { .. } => "Array",
+                Value::Tuple { .. } => "Tuple",
+                Value::IntegerEntry { .. } => "IntegerEntry",
+                Value::String { .. } => "String",
+                Value::Int { .. } => "Int",
+            }
+        }
+
+        #[inline]
+        fn type_error(&self, expected: &'static str) -> TypeError {
+            TypeError(self.value_type_name(), expected)
+        }
     }
 }

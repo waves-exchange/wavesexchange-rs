@@ -1,6 +1,6 @@
 [package]
 name = "wavesexchange_apis"
-version = "0.1.23"
+version = "0.1.24"
 edition = "2021"
 authors = ["Artem Sidorenko <kronos44_0@mail.ru>"]
 
@@ -20,7 +20,7 @@ thiserror = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 waves-protobuf-schemas = { git = "https://github.com/wavesplatform/protobuf-schemas", tag = "rust_v1.4.3-1" }
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
-wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.5" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.6" }
 
 [dev-dependencies]
 tokio-test = "0.4"
