@@ -40,6 +40,14 @@ impl DataEntryValue {
     }
 
     #[inline]
+    pub fn try_into_integer(self) -> Result<i64, TypeError> {
+        match self {
+            DataEntryValue::Integer(i) => Ok(i),
+            _ => Err(self.type_error("Integer")),
+        }
+    }
+
+    #[inline]
     pub fn try_as_integer(&self) -> Result<i64, TypeError> {
         match self {
             DataEntryValue::Integer(i) => Ok(*i),
@@ -48,10 +56,26 @@ impl DataEntryValue {
     }
 
     #[inline]
+    pub fn try_into_binary(self) -> Result<Vec<u8>, TypeError> {
+        match self {
+            DataEntryValue::Binary(b) => Ok(b),
+            _ => Err(self.type_error("Binary")),
+        }
+    }
+
+    #[inline]
     pub fn try_as_binary(&self) -> Result<&[u8], TypeError> {
         match self {
             DataEntryValue::Binary(b) => Ok(b.as_slice()),
             _ => Err(self.type_error("Binary")),
+        }
+    }
+
+    #[inline]
+    pub fn try_into_boolean(self) -> Result<bool, TypeError> {
+        match self {
+            DataEntryValue::Boolean(b) => Ok(b),
+            _ => Err(self.type_error("Boolean")),
         }
     }
 

@@ -299,6 +299,16 @@ pub mod dto {
                 DataEntryResponse::Binary { value, .. } => DataEntryValue::Binary(value),
             }
         }
+
+        #[inline]
+        pub fn into_key_value(self) -> (String, DataEntryValue) {
+            match self {
+                DataEntryResponse::String { key, value } => (key, DataEntryValue::String(value)),
+                DataEntryResponse::Integer { key, value } => (key, DataEntryValue::Integer(value)),
+                DataEntryResponse::Boolean { key, value } => (key, DataEntryValue::Boolean(value)),
+                DataEntryResponse::Binary { key, value } => (key, DataEntryValue::Binary(value)),
+            }
+        }
     }
 
     impl Value {
@@ -306,6 +316,14 @@ pub mod dto {
         pub fn try_as_array(&self) -> Result<&[Value], TypeError> {
             match self {
                 Value::Array { value } => Ok(value.as_slice()),
+                _ => Err(self.type_error("Array")),
+            }
+        }
+
+        #[inline]
+        pub fn try_into_array(self) -> Result<Vec<Value>, TypeError> {
+            match self {
+                Value::Array { value } => Ok(value),
                 _ => Err(self.type_error("Array")),
             }
         }
@@ -346,6 +364,14 @@ pub mod dto {
         pub fn try_as_int(&self) -> Result<i64, TypeError> {
             match self {
                 Value::Int { value } => Ok(*value),
+                _ => Err(self.type_error("Int")),
+            }
+        }
+
+        #[inline]
+        pub fn try_into_int(self) -> Result<i64, TypeError> {
+            match self {
+                Value::Int { value } => Ok(value),
                 _ => Err(self.type_error("Int")),
             }
         }
