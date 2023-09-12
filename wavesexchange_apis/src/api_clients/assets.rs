@@ -86,8 +86,21 @@ pub mod dto {
         Qualified,
         WaVerified,
         CommunityVerified,
+        #[serde(rename = "WX")]
+        WX,
+        #[serde(rename = "3RD_PARTY")]
+        ThirdParty,
+        Pepe,
+        #[serde(rename = "STAKING_LP")]
+        StakingLP,
+        #[serde(rename = "ALGO_LP")]
+        AlgoLP,
+        #[serde(rename = "POOLS_LP")]
+        PoolsLP,
         #[serde(rename = "null")]
         WithoutLabels,
+        #[serde(other)]
+        Other,
     }
 
     #[derive(Clone, Debug, Deserialize)]
