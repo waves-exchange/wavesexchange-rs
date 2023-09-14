@@ -7,3 +7,5 @@ members = [
     "wavesexchange_loaders",
     "wavesexchange_apis",
 ]
+
+resolver = "2"

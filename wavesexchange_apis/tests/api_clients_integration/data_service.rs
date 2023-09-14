@@ -85,14 +85,14 @@ mod mainnet {
     #[test_with::env(INTEGRATION)]
     #[tokio::test]
     async fn get_exchange_transactions() {
-        let date1 = DateTime::from_utc(
+        let date1 = DateTime::from_naive_utc_and_offset(
             NaiveDate::from_ymd_opt(2021, 05, 01)
                 .unwrap()
                 .and_hms_opt(0, 0, 0)
                 .unwrap(),
             Utc,
         );
-        let date2 = DateTime::from_utc(
+        let date2 = DateTime::from_naive_utc_and_offset(
             NaiveDate::from_ymd_opt(2021, 05, 01)
                 .unwrap()
                 .and_hms_opt(0, 30, 0)

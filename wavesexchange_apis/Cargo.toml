@@ -7,10 +7,10 @@ authors = ["Artem Sidorenko <kronos44_0@mail.ru>"]
 [dependencies]
 # Using bigdecimal which is compatible with diesel: Diesel 1.x requires 0.1, Diesel 2.x can use up to 0.3
 bigdecimal = { version = ">=0.0.13, < 0.4.0", features = ["serde"] }
-bs58 = "0.4"
+bs58 = "0.5"
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 futures = "0.3"
-itertools = "0.10"
+itertools = "0.11"
 percent-encoding = "2"
 reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
@@ -24,4 +24,4 @@ wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs
 
 [dev-dependencies]
 tokio-test = "0.4"
-test-with = { version = "0.9", default-features = false, features = [] }
+test-with = { version = "0.10", default-features = false, features = [] }
