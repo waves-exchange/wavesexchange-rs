@@ -24,7 +24,7 @@ impl HttpClient<RatesService> {
         for chunk_pairs in pairs.chunks(100) {
             let body = dto::RatesRequest {
                 pairs: chunk_pairs.to_vec(),
-                timestamp: timestamp,
+                timestamp,
             };
             let mut resp: dto::RatesResponse = self
                 .create_req_handler(self.http_post("rates").json(&body), "rates::rates")
