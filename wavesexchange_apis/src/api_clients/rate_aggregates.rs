@@ -41,6 +41,8 @@ impl HttpClient<RateAggregates> {
 
     /// Get rate aggregates for multiple asset pairs.
     /// Maximum number of pairs is 32 (limited by GET URL length).
+    ///
+    /// If no pairs specified, no HTTP request is made, and empty reply is returned immediately.
     pub async fn mget(
         &self,
         asset_pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
@@ -51,6 +53,11 @@ impl HttpClient<RateAggregates> {
             .into_iter()
             .map(|(a, b)| (a.into(), b.into()))
             .collect_vec();
+
+        // Do not make HTTP request which will return error anyway, just exit with empty reply
+        if asset_pairs.is_empty() {
+            return Ok(dto::RateAggregatesResponse::default());
+        }
 
         // This API has limit on number of pairs,
         // so if exceeded - split long request into smaller chunks
@@ -113,7 +120,7 @@ pub mod dto {
     use chrono::NaiveDateTime;
     use serde::Deserialize;
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Default, Clone, Deserialize)]
     pub struct RateAggregatesResponse {
         pub items: Vec<RateAggregates>,
     }
