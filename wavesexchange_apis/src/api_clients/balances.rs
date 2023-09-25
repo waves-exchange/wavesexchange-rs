@@ -3,8 +3,15 @@ use chrono::{DateTime, Utc};
 use crate::{ApiResult, BaseApi, HttpClient};
 use std::fmt::Debug;
 
+const CHUNK_SIZE: usize = 100;
+
 #[derive(Clone, Debug)]
 pub struct BalancesService;
+
+pub enum BlockRef {
+    Height(i32),
+    Timestamp(DateTime<Utc>)
+}
 
 impl BaseApi for BalancesService {}
 
@@ -12,10 +19,11 @@ impl HttpClient<BalancesService> {
     pub async fn balance_history(
         &self,
         pairs: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
-        height: Option<i32>,
+        block_ref: Option<BlockRef>,
     ) -> ApiResult<dto::BalancesResponse> {
-        let balances_url = match height {
-            Some(h) => format!("balance_history?height={}", h),
+        let balances_url = match block_ref {
+            Some(BlockRef::Height(h)) => format!("balance_history?height={}", h),
+            Some(BlockRef::Timestamp(t)) => format!("balance_history?timestamp={}", t.format("%Y-%m-%dT%H:%M:%SZ")),
             None => "balance_history".into(),
         };
 
@@ -29,7 +37,7 @@ impl HttpClient<BalancesService> {
 
         let mut balances = vec![];
 
-        for chunk_pairs in pairs.chunks(100) {
+        for chunk_pairs in pairs.chunks(CHUNK_SIZE) {
             let body = dto::BalancesRequest {
                 address_asset_pairs: chunk_pairs.to_vec(),
             };
