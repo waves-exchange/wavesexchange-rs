@@ -1,6 +1,5 @@
 use serde::Serialize;
-use std::fmt::Debug;
-use std::future::Future;
+use std::{fmt::Debug, future::Future};
 use warp::{
     filters::BoxedFilter,
     http::StatusCode,
@@ -8,9 +7,20 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
-pub const LIVEZ_URL: &str = "livez";
-pub const READYZ_URL: &str = "readyz";
-pub const STARTZ_URL: &str = "startz";
+const LIVEZ_URL: &str = "livez";
+const READYZ_URL: &str = "readyz";
+const STARTZ_URL: &str = "startz";
+
+/// Service readiness status.
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Readiness {
+    /// Service is fully ready and operating (both `/readyz` and `/livez` returns OK).
+    Ready,
+    /// Service is temporarily not ready (`/readyz` returns error, but `/livez` is OK).
+    NotReady,
+    /// Service is completely dead and must ve restarted (both `/readyz` and `/livez` returns error).
+    Dead,
+}
 
 pub trait Shared: Send + Sync + 'static {}
 impl<T> Shared for T where T: Send + Sync + 'static {}
@@ -101,7 +111,6 @@ impl<F, E: Debug + Shared> Checkz<E> for F where
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use serde_json::Value;
     use warp::test;
@@ -116,15 +125,13 @@ mod tests {
 
     #[tokio::test]
     async fn check_readiness() {
-        let request = test::request().path("/readyz");
-        let filters = readyz().with_checker(|| async { Err("not enough racoons") });
-        let result = request.reply(&filters).await;
+        let filter = readyz().with_checker(|| async { Err("not enough racoons") });
+        let result = test::request().path("/readyz").reply(&filter).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
         assert_eq!(result["status"], format!("{:?}", "not enough racoons"));
 
-        let request = test::request().path("/readyz");
-        let filters = readyz();
-        let result = request.reply(&filters).await;
+        let filter = readyz();
+        let result = test::request().path("/readyz").reply(&filter).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
         assert_eq!(result["status"], "ok");
     }
@@ -140,13 +147,11 @@ mod tests {
             Ok(())
         }
 
-        let request = test::request().path("/startz");
-
         let s = Str {
             _c: String::from("test"),
         };
-        let filters = startz().with_checker(|| async { ctrl_test(s).await });
-        let result = request.reply(&filters).await;
+        let filter = startz().with_checker(|| async { ctrl_test(s).await });
+        let result = test::request().path("/startz").reply(&filter).await;
         let result = serde_json::from_slice::<Value>(&result.into_body()).unwrap();
         assert_eq!(result["status"], "ok");
     }

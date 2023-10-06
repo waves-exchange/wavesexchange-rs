@@ -1,11 +1,20 @@
 use super::{
-    liveness::{LivenessReply, Shared},
+    liveness::{LivenessReply, Readiness, Shared},
     livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz,
 };
 use futures::future::{join, BoxFuture, FutureExt};
 use lazy_static::lazy_static;
 use prometheus::{core::Collector, HistogramOpts, HistogramVec, IntCounter, Registry, TextEncoder};
-use std::{env, fmt::Debug, future::Future};
+use std::{
+    env,
+    fmt::Debug,
+    future::Future,
+    sync::{Arc, Mutex},
+};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task,
+};
 use warp::{filters::BoxedFilter, log::Info, Filter, Rejection, Reply};
 
 lazy_static! {
@@ -173,6 +182,127 @@ impl MetricsWarpBuilder {
         self
     }
 
+    /// Provide a oneshot channel for 'initialization finished' signal,
+    /// once it is received the service will start to report that it is ready.
+    ///
+    /// Example:
+    /// ```no_run
+    /// use tokio::sync::oneshot;
+    /// # use wavesexchange_warp::MetricsWarpBuilder;
+    /// # let builder = MetricsWarpBuilder::new();
+    /// let (tx, rx) = oneshot::channel();
+    /// let server_future = builder.with_init_channel(rx);
+    /// // ... run initialization code ...
+    /// tx.send(()).unwrap();
+    /// ```
+    pub fn with_init_channel(mut self, chn: oneshot::Receiver<()>) -> Self {
+        let is_initialized = Arc::new(Mutex::new(false));
+
+        task::spawn({
+            let is_initialized = is_initialized.clone();
+            async move {
+                match chn.await {
+                    Ok(()) => {
+                        let mut is_initialized = is_initialized.lock().unwrap();
+                        *is_initialized = true;
+                    }
+                    Err(_) => {
+                        // Sender was dropped before sending a message,
+                        // which means something went wrong and initialization
+                        // will never succeed, so we panic here
+                        panic!("initialization failed?");
+                    }
+                }
+            }
+        });
+
+        self.readyz = readyz_fn()
+            .with_checker(move || async move {
+                let is_initialized = is_initialized.lock().unwrap();
+                if *is_initialized {
+                    Ok(())
+                } else {
+                    Err(ServiceStatusError::InitInProgress)
+                }
+            })
+            .boxed();
+
+        self
+    }
+
+    /// Provide a channel for readiness status changes.
+    ///
+    /// Example:
+    /// ```no_run
+    /// use tokio::sync::mpsc;
+    /// use wavesexchange_warp::endpoints::Readiness;
+    /// # use wavesexchange_warp::MetricsWarpBuilder;
+    /// # let builder = MetricsWarpBuilder::new();
+    /// let (tx, rx) = mpsc::unbounded_channel();
+    /// let server_future = builder.with_readiness_channel(rx);
+    /// // ... default status is Ready ...
+    /// tx.send(Readiness::NotReady).unwrap(); // Something bad happened
+    /// // . . . . .
+    /// tx.send(Readiness::Ready).unwrap(); // Things are back to normal
+    /// // . . . . .
+    /// tx.send(Readiness::Dead).unwrap(); // Something's screwed up, service will be killed by the orchestration framework
+    /// ```
+    pub fn with_readiness_channel(mut self, mut chn: mpsc::UnboundedReceiver<Readiness>) -> Self {
+        let readiness = Arc::new(Mutex::new(Readiness::Ready));
+
+        task::spawn({
+            let readiness = readiness.clone();
+            async move {
+                match chn.recv().await {
+                    Some(status) => {
+                        let mut readiness = readiness.lock().unwrap();
+                        *readiness = status;
+                    }
+                    None => {
+                        // All senders were dropped, so no new messages can ever be received,
+                        // and the current readiness status is final.
+                        // If it indicates "not ready" - we panic, because anyway it could
+                        // not be changed back to "ready" anymore.
+                        let readiness = readiness.lock().unwrap();
+                        if *readiness == Readiness::NotReady {
+                            panic!("service will never be ready again");
+                        }
+                    }
+                }
+            }
+        });
+
+        self.readyz = readyz_fn()
+            .with_checker({
+                let readiness = readiness.clone();
+                move || async move {
+                    let readiness = readiness.lock().unwrap();
+                    if *readiness == Readiness::Ready {
+                        Ok(())
+                    } else {
+                        Err(ServiceStatusError::ServiceNotReady)
+                    }
+                }
+            })
+            .boxed();
+
+        self.livez = readyz_fn()
+            .with_checker({
+                let readiness = readiness.clone();
+                move || async move {
+                    let readiness = readiness.lock().unwrap();
+                    if *readiness != Readiness::Dead {
+                        Ok(())
+                    } else {
+                        Err(ServiceStatusError::ServiceDead)
+                    }
+                }
+            })
+            .boxed();
+
+        self
+    }
+
     /// Register prometheus metric. No need to `Box::new`.
     ///
     /// Note: if metric is created by `lazy_static!` or analogues, deref it first:
@@ -276,4 +406,22 @@ where
     F: SharedFilter<R, E>,
 {
     filter.map(|f| Box::new(f) as Box<dyn Reply>).boxed()
+}
+
+#[derive(Clone, Copy, thiserror::Error)]
+enum ServiceStatusError {
+    #[error("service initialization in progress")]
+    InitInProgress,
+
+    #[error("service not ready")]
+    ServiceNotReady,
+
+    #[error("service is dead")]
+    ServiceDead,
+}
+
+impl Debug for ServiceStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_string())
+    }
 }
