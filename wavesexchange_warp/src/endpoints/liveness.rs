@@ -12,7 +12,7 @@ const READYZ_URL: &str = "readyz";
 const STARTZ_URL: &str = "startz";
 
 /// Service readiness status.
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Readiness {
     /// Service is fully ready and operating (both `/readyz` and `/livez` returns OK).
     Ready,
