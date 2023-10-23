@@ -253,21 +253,17 @@ impl MetricsWarpBuilder {
         task::spawn({
             let readiness = readiness.clone();
             async move {
-                match chn.recv().await {
-                    Some(status) => {
-                        let mut readiness = readiness.lock().unwrap();
-                        *readiness = status;
-                    }
-                    None => {
-                        // All senders were dropped, so no new messages can ever be received,
-                        // and the current readiness status is final.
-                        // If it indicates "not ready" - we panic, because anyway it could
-                        // not be changed back to "ready" anymore.
-                        let readiness = readiness.lock().unwrap();
-                        if *readiness == Readiness::NotReady {
-                            panic!("service will never be ready again");
-                        }
-                    }
+                while let Some(status) = chn.recv().await {
+                    let mut readiness = readiness.lock().unwrap();
+                    *readiness = status;
+                }
+                // All senders were dropped, so no new messages can ever be received,
+                // and the current readiness status is final.
+                // If it indicates "not ready" - we panic, because anyway it could
+                // not be changed back to "ready" anymore.
+                let readiness = readiness.lock().unwrap();
+                if *readiness == Readiness::NotReady {
+                    panic!("service will never be ready again");
                 }
             }
         });
