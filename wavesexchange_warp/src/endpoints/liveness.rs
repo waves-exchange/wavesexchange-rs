@@ -26,7 +26,7 @@ pub trait Shared: Send + Sync + 'static {}
 impl<T> Shared for T where T: Send + Sync + 'static {}
 
 #[derive(Clone)]
-pub struct LivenessReply {
+pub(crate) struct LivenessReply {
     err: Option<String>,
 }
 
@@ -69,19 +69,19 @@ impl Reply for LivenessReply {
     }
 }
 
-pub fn livez() -> impl Filter<Extract = (LivenessReply,), Error = Rejection> + Clone {
+pub(crate) fn livez() -> impl Filter<Extract = (LivenessReply,), Error = Rejection> + Clone {
     warp::path(LIVEZ_URL).map(LivenessReply::ok)
 }
 
-pub fn readyz() -> impl Filter<Extract = (LivenessReply,), Error = Rejection> + Clone {
+pub(crate) fn readyz() -> impl Filter<Extract = (LivenessReply,), Error = Rejection> + Clone {
     warp::path(READYZ_URL).map(LivenessReply::ok)
 }
 
-pub fn startz() -> impl Filter<Extract = (LivenessReply,), Error = Rejection> + Clone {
+pub(crate) fn startz() -> impl Filter<Extract = (LivenessReply,), Error = Rejection> + Clone {
     warp::path(STARTZ_URL).map(LivenessReply::ok)
 }
 
-pub trait Checkz<E>:
+pub(crate) trait Checkz<E>:
     Filter<Extract = (LivenessReply,), Error = Rejection> + Clone + Shared
 where
     E: Debug + Shared,

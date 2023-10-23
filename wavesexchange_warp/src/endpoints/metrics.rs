@@ -1,6 +1,6 @@
-use super::{
-    liveness::{LivenessReply, Readiness, Shared},
-    livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz,
+use super::liveness::{
+    livez as livez_fn, readyz as readyz_fn, startz as startz_fn, Checkz, LivenessReply, Readiness,
+    Shared,
 };
 use futures::future::{join, BoxFuture, FutureExt};
 use lazy_static::lazy_static;
