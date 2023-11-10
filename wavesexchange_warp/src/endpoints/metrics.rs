@@ -356,32 +356,25 @@ impl MetricsWarpBuilder {
             .and(warp::any().map(move || registry.clone()))
             .then(metrics_handler);
 
-        let warp_metrics_instance_prepared =
-            warp::serve(metrics_filter.or(livez).or(readyz).or(startz));
+        let metrics_web_server = warp::serve(metrics_filter.or(livez).or(readyz).or(startz));
 
         match main_routes {
             Some(routes) => {
-                let warp_main_instance_prepared =
-                    warp::serve(routes.with(warp::log::custom(estimate_request)));
+                let main_web_server = warp::serve(routes.with(warp::log::custom(estimate_request)));
 
                 let (main_server, metrics_server) = match graceful_shutdown_signal {
                     Some(signal) => {
-                        let shared_signal = signal.shared();
-                        let (_addr, warp_main_instance) = warp_main_instance_prepared
-                            .bind_with_graceful_shutdown(
-                                (host, main_routes_port),
-                                shared_signal.clone(),
-                            );
-                        let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
-                            .bind_with_graceful_shutdown((host, metrics_port), shared_signal);
-                        (warp_main_instance.boxed(), warp_metrics_instance.boxed())
+                        let signal = signal.shared();
+                        let (_addr, main_server) = main_web_server
+                            .bind_with_graceful_shutdown((host, main_routes_port), signal.clone());
+                        let (_addr, metrics_server) = metrics_web_server
+                            .bind_with_graceful_shutdown((host, metrics_port), signal);
+                        (main_server.boxed(), metrics_server.boxed())
                     }
                     None => {
-                        let warp_main_instance =
-                            warp_main_instance_prepared.run((host, main_routes_port));
-                        let warp_metrics_instance =
-                            warp_metrics_instance_prepared.run((host, metrics_port));
-                        (warp_main_instance.boxed(), warp_metrics_instance.boxed())
+                        let main_server = main_web_server.run((host, main_routes_port));
+                        let metrics_server = metrics_web_server.run((host, metrics_port));
+                        (main_server.boxed(), metrics_server.boxed())
                     }
                 };
                 // Run both web-servers on different Tokio tasks to avoid any unanticipated interference
@@ -391,15 +384,11 @@ impl MetricsWarpBuilder {
             }
             None => match graceful_shutdown_signal {
                 Some(signal) => {
-                    let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
+                    let (_addr, metrics_server) = metrics_web_server
                         .bind_with_graceful_shutdown((host, metrics_port), signal);
-                    warp_metrics_instance.await;
+                    metrics_server.await;
                 }
-                None => {
-                    warp_metrics_instance_prepared
-                        .run((host, metrics_port))
-                        .await
-                }
+                None => metrics_web_server.run((host, metrics_port)).await,
             },
         }
     }
