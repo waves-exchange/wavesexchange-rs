@@ -262,8 +262,10 @@ impl MetricsWarpBuilder {
                 // If it indicates "not ready" - we panic, because anyway it could
                 // not be changed back to "ready" anymore.
                 let readiness = readiness.lock().unwrap();
-                if *readiness == Readiness::NotReady {
-                    panic!("service will never be ready again");
+                let final_state = *readiness;
+                drop(readiness);
+                if final_state != Readiness::Ready {
+                    panic!("service will never be ready again - aborting");
                 }
             }
         });
