@@ -282,7 +282,7 @@ impl MetricsWarpBuilder {
             })
             .boxed();
 
-        self.livez = readyz_fn()
+        self.livez = livez_fn()
             .with_checker({
                 let readiness = readiness.clone();
                 move || async move {
