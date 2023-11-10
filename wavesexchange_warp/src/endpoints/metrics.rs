@@ -327,7 +327,11 @@ impl MetricsWarpBuilder {
         self
     }
 
-    /// Run warp instance(s) on current thread
+    /// Build Warp instance(s) and run them forever.
+    /// If there is only one (metrics) Warp server instance, it will be run on the current Tokio task.
+    /// In case of two Warp instances (main + metrics), one of them will be run on the current task,
+    /// and the other on a separate task, to avoid any interference between them
+    /// (e.g. programming errors in web handlers in main server will not affect the metrics server).
     pub async fn run_async(mut self) {
         self = self
             .with_metric(&*REQUESTS)
@@ -360,7 +364,7 @@ impl MetricsWarpBuilder {
                 let warp_main_instance_prepared =
                     warp::serve(routes.with(warp::log::custom(estimate_request)));
 
-                match graceful_shutdown_signal {
+                let (main_server, metrics_server) = match graceful_shutdown_signal {
                     Some(signal) => {
                         let shared_signal = signal.shared();
                         let (_addr, warp_main_instance) = warp_main_instance_prepared
@@ -370,16 +374,20 @@ impl MetricsWarpBuilder {
                             );
                         let (_addr, warp_metrics_instance) = warp_metrics_instance_prepared
                             .bind_with_graceful_shutdown((host, metrics_port), shared_signal);
-                        join(warp_main_instance, warp_metrics_instance).await;
+                        (warp_main_instance.boxed(), warp_metrics_instance.boxed())
                     }
                     None => {
                         let warp_main_instance =
                             warp_main_instance_prepared.run((host, main_routes_port));
                         let warp_metrics_instance =
                             warp_metrics_instance_prepared.run((host, metrics_port));
-                        join(warp_main_instance, warp_metrics_instance).await;
+                        (warp_main_instance.boxed(), warp_metrics_instance.boxed())
                     }
-                }
+                };
+                // Run both web-servers on different Tokio tasks to avoid any unanticipated interference
+                let metrics_server = task::spawn(metrics_server);
+                let ((), task_err) = join(main_server, metrics_server).await;
+                task_err.expect("metrics web-server panicked");
             }
             None => match graceful_shutdown_signal {
                 Some(signal) => {
