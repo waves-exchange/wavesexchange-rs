@@ -6,6 +6,7 @@ members = [
     "wavesexchange_topic",
     "wavesexchange_loaders",
     "wavesexchange_apis",
+    "wavesexchange_liveness",
 ]
 
 resolver = "2"

@@ -1,0 +1,11 @@
+[package]
+name = "wavesexchange_liveness"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.9" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+diesel = { version = "1.4", features = ["chrono", "postgres", "chrono"] }
