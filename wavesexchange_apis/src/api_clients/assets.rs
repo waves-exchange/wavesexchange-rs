@@ -167,8 +167,8 @@ pub mod request {
         }
 
         /// Search string. Default is None.
-        pub fn with_search_string(mut self, search_string: String) -> Self {
-            self.search = Some(search_string);
+        pub fn with_search_string(mut self, search_string: impl Into<String>) -> Self {
+            self.search = Some(search_string.into());
             self
         }
 
@@ -179,14 +179,14 @@ pub mod request {
         }
 
         /// Ticker value or `*` for any asset having ticker value. Default is None.
-        pub fn with_ticker(mut self, ticker: String) -> Self {
-            self.ticker = Some(ticker);
+        pub fn with_ticker(mut self, ticker: impl Into<String>) -> Self {
+            self.ticker = Some(ticker.into());
             self
         }
 
         /// Asset labels contain label value or `*` for assets having any label. Default is None.
-        pub fn with_label(mut self, label: String) -> Self {
-            self.label = Some(label);
+        pub fn with_label(mut self, label: impl Into<String>) -> Self {
+            self.label = Some(label.into());
             self
         }
 
@@ -197,8 +197,8 @@ pub mod request {
         }
 
         /// Asset issuer address (base58 string) filter. Default is None.
-        pub fn with_issuers(mut self, issuers: &[String]) -> Self {
-            self.issuers = Some(issuers.iter().cloned().collect());
+        pub fn with_issuers(mut self, issuers: impl IntoIterator<Item = impl Into<String>>) -> Self {
+            self.issuers = Some(issuers.into_iter().map(Into::into).collect());
             self
         }
 
