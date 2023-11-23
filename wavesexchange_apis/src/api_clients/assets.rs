@@ -76,6 +76,7 @@ impl HttpClient<AssetsService> {
             include_metadata: req.include_metadata,
             search: req.search,
             ticker: req.ticker,
+            ext_ticker: req.ext_ticker,
             smart: req.smart,
             label: req.label,
             label__in: req.labels.map(|set| set.into_iter().collect_vec()),
@@ -118,6 +119,8 @@ pub mod request {
         pub(super) ids: Option<Vec<String>>,
         /// Ticker value or `*` for any asset having ticker value. Default is None.
         pub(super) ticker: Option<String>,
+        /// External ticker value or `*` for any asset having external ticker value. Default is None.
+        pub(super) ext_ticker: Option<String>,
         /// Asset labels contain label value or `*` for assets having any label. Default is None.
         pub(super) label: Option<String>,
         /// Asset labels to query. Default is None.
@@ -144,6 +147,7 @@ pub mod request {
                 search: None,
                 ids: None,
                 ticker: None,
+                ext_ticker: None,
                 label: None,
                 labels: None,
                 issuers: None,
@@ -181,6 +185,12 @@ pub mod request {
         /// Ticker value or `*` for any asset having ticker value. Default is None.
         pub fn with_ticker(mut self, ticker: impl Into<String>) -> Self {
             self.ticker = Some(ticker.into());
+            self
+        }
+
+        /// External ticker value or `*` for any asset having external ticker value. Default is None.
+        pub fn with_ext_ticker(mut self, ext_ticker: impl Into<String>) -> Self {
+            self.ext_ticker = Some(ext_ticker.into());
             self
         }
 
@@ -302,6 +312,7 @@ pub mod dto {
     #[derive(Clone, Debug, Deserialize)]
     pub struct FullAssetInfo {
         pub ticker: Option<String>,
+        pub ext_ticker: Option<String>,
         pub id: String,
         pub name: String,
         pub precision: i32,
@@ -350,6 +361,7 @@ pub mod dto {
         pub include_metadata: bool,
         pub search: Option<String>,
         pub ticker: Option<String>,
+        pub ext_ticker: Option<String>,
         pub smart: Option<bool>,
         pub label: Option<String>,
         pub label__in: Option<Vec<AssetLabel>>,
