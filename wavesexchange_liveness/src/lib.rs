@@ -16,35 +16,17 @@ struct LastBlock {
     last_change: Instant,
 }
 
-pub struct PostgresConfig {
-    pub host: String,
-    pub port: u16,
-    pub database: String,
-    pub user: String,
-    pub password: String,
-    pub poolsize: u32,
-}
-
 #[derive(QueryableByName)]
 struct LastBlockTimestamp {
-    #[sql_type = "BigInt"]
+    #[diesel(sql_type = BigInt)]
     time_stamp: i64,
 }
 
-fn get_conn(pgconfig: &PostgresConfig) -> Result<PgConnection, diesel::result::ConnectionError> {
-    let db_url = format!(
-        "postgres://{}:{}@{}:{}/{}",
-        pgconfig.user, pgconfig.password, pgconfig.host, pgconfig.port, pgconfig.database
-    );
-    PgConnection::establish(&db_url)
-}
-
 pub fn channel(
-    pgconfig: PostgresConfig,
+    db_url: String,
     poll_interval_secs: u64,
     max_block_age: Duration,
 ) -> UnboundedReceiver<Readiness> {
-    let pgconfig: PostgresConfig = pgconfig.into();
     let (readiness_tx, readiness_rx) = tokio::sync::mpsc::unbounded_channel();
 
     let mut last_block = LastBlock {
@@ -62,10 +44,10 @@ pub fn channel(
 
             tokio::time::sleep(std::time::Duration::from_secs(poll_interval_secs)).await;
 
-            match get_conn(&pgconfig) {
-                Ok(conn) => {
+            match PgConnection::establish(&db_url) {
+                Ok(mut conn) => {
                     let query_result = diesel::sql_query(LAST_BLOCK_TIMESTAMP_QUERY)
-                        .load::<LastBlockTimestamp>(&conn)
+                        .load::<LastBlockTimestamp>(&mut conn)
                         .map(|results| results.into_iter().next().map(|result| result.time_stamp));
 
                     match query_result {
