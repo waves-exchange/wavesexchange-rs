@@ -9,7 +9,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use wavesexchange_log::{debug, error};
 use wavesexchange_warp::endpoints::Readiness;
 
-const LAST_BLOCK_TIMESTAMP_QUERY: &str = "SELECT time_stamp FROM blocks_microblocks WHERE time_stamp IS NOT NULL ORDER BY uid DESC LIMIT 1";
+const LAST_BLOCK_TIMESTAMP_QUERY: &str = "SELECT time_stamp FROM blocks_microblocks WHERE time_stamp IS NOT NULL AND time_stamp != 0 ORDER BY uid DESC LIMIT 1";
 
 struct LastBlock {
     timestamp: i64,
