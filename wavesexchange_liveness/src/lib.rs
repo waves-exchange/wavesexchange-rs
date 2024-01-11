@@ -26,6 +26,7 @@ pub fn channel(
     db_url: String,
     poll_interval_secs: u64,
     max_block_age: Duration,
+    custom_query: Option<String>,
 ) -> UnboundedReceiver<Readiness> {
     let (readiness_tx, readiness_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -33,6 +34,7 @@ pub fn channel(
         timestamp: 0,
         last_change: Instant::now(),
     };
+    let query = custom_query.unwrap_or(LAST_BLOCK_TIMESTAMP_QUERY.to_string());
 
     tokio::spawn(async move {
         loop {
@@ -46,7 +48,7 @@ pub fn channel(
 
             match PgConnection::establish(&db_url) {
                 Ok(mut conn) => {
-                    let query_result = diesel::sql_query(LAST_BLOCK_TIMESTAMP_QUERY)
+                    let query_result = diesel::sql_query(&query)
                         .load::<LastBlockTimestamp>(&mut conn)
                         .map(|results| results.into_iter().next().map(|result| result.time_stamp));
 
