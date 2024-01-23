@@ -1,11 +1,10 @@
 [package]
 name = "wavesexchange_liveness"
-version = "0.1.0"
+version = "0.3.1"
 edition = "2021"
-
 
 [dependencies]
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
-wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.9" }
-tokio = { version = "1" }
-diesel = { version = "2.0", features = ["postgres"] }
+wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.10" }
+tokio = { version = "1", default-features = false }
+diesel = { version = "2.0", default-features = false, features = ["postgres"] }
