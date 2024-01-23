@@ -13,5 +13,5 @@ thiserror = "1"
 anymap = "0.12"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "time"] }
+tokio = { version = "1", default-features = false, features = ["macros", "time"] }
 tokio-test = "0.4"
