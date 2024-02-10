@@ -1,10 +1,20 @@
 [package]
 name = "wavesexchange_liveness"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 
 [dependencies]
 wavesexchange_log = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_log/0.5.1" }
 wavesexchange_warp = { git = "https://github.com/waves-exchange/wavesexchange-rs", tag = "wavesexchange_warp/0.14.10" }
 tokio = { version = "1", default-features = false }
-diesel = { version = "2.0", default-features = false, features = ["postgres"] }
+
+diesel1 = { optional = true, package = "diesel", version = "1", default-features = false, features = ["postgres"] }
+diesel2 = { optional = true, package = "diesel", version = "2", default-features = false, features = ["postgres"] }
+
+[features]
+# This crate builds with Diesel 2.x by default.
+# To use it with Diesel 1.x one must use a corresponding feature:
+# ```Cargo.toml
+# wavesexchange_liveness = { version = "0.4", default-features = false, features = ["diesel1"] }
+# ```
+default = ["diesel2"]

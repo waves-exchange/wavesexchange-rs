@@ -1,11 +1,20 @@
-use diesel::sql_types::BigInt;
-use diesel::Connection;
-use diesel::PgConnection;
-use diesel::QueryableByName;
-use diesel::RunQueryDsl;
-use std::time::Duration;
-use std::time::Instant;
-use tokio::sync::mpsc::UnboundedReceiver;
+//! Liveness probe based on periodic Postgres query check
+
+#[cfg(all(feature = "diesel1", not(feature = "diesel2")))]
+extern crate diesel1 as diesel; // Diesel 1.x
+
+#[cfg(all(feature = "diesel2", not(feature = "diesel1")))]
+extern crate diesel2 as diesel; // Diesel 2.x
+
+#[rustfmt::skip]
+#[cfg(any(all(feature = "diesel1", feature = "diesel2"), not(any(feature = "diesel1", feature = "diesel2"))))]
+compile_error!("Either feature \"diesel1\" or \"diesel2\" must be enabled for this crate, but not both.");
+
+use diesel::{
+    sql_query, sql_types::BigInt, Connection, PgConnection, QueryableByName, RunQueryDsl,
+};
+use std::time::{Duration, Instant};
+use tokio::{sync::mpsc, task, time};
 use wavesexchange_log::{debug, error};
 use wavesexchange_warp::endpoints::Readiness;
 
@@ -18,7 +27,8 @@ struct LastBlock {
 
 #[derive(QueryableByName)]
 struct LastBlockTimestamp {
-    #[diesel(sql_type = BigInt)]
+    #[cfg_attr(feature = "diesel1", sql_type = "BigInt")] // for Diesel 1.x
+    #[cfg_attr(feature = "diesel2", diesel(sql_type = BigInt))] // for Diesel 2.x
     time_stamp: i64,
 }
 
@@ -27,8 +37,8 @@ pub fn channel(
     poll_interval_secs: u64,
     max_block_age: Duration,
     custom_query: Option<String>,
-) -> UnboundedReceiver<Readiness> {
-    let (readiness_tx, readiness_rx) = tokio::sync::mpsc::unbounded_channel();
+) -> mpsc::UnboundedReceiver<Readiness> {
+    let (readiness_tx, readiness_rx) = mpsc::unbounded_channel();
 
     let mut last_block = LastBlock {
         timestamp: 0,
@@ -36,7 +46,7 @@ pub fn channel(
     };
     let query = custom_query.unwrap_or(LAST_BLOCK_TIMESTAMP_QUERY.to_string());
 
-    tokio::spawn(async move {
+    task::spawn(async move {
         loop {
             let send = |status: Readiness| {
                 if readiness_tx.send(status).is_err() {
@@ -44,11 +54,11 @@ pub fn channel(
                 }
             };
 
-            tokio::time::sleep(std::time::Duration::from_secs(poll_interval_secs)).await;
+            time::sleep(Duration::from_secs(poll_interval_secs)).await;
 
             match PgConnection::establish(&db_url) {
                 Ok(mut conn) => {
-                    let query_result = diesel::sql_query(&query)
+                    let query_result = sql_query(&query)
                         .load::<LastBlockTimestamp>(&mut conn)
                         .map(|results| results.into_iter().next().map(|result| result.time_stamp));
 
