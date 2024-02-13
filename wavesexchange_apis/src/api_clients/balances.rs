@@ -8,6 +8,7 @@ const CHUNK_SIZE: usize = 100;
 #[derive(Clone, Debug)]
 pub struct BalancesService;
 
+#[derive(Clone, Debug)]
 pub enum BlockRef {
     Height(i32),
     Timestamp(DateTime<Utc>)
