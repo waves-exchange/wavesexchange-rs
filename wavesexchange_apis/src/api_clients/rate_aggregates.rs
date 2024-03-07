@@ -8,6 +8,9 @@ pub struct RateAggregates;
 
 impl BaseApi for RateAggregates {}
 
+#[allow(deprecated)] // Can't use `try_days()` as suggested because `unwrap()` and `expect()` are not (yet?) available in const context as of Rust 1.76
+const ONE_DAY: Duration = Duration::days(1);
+
 impl HttpClient<RateAggregates> {
     /// Get rate aggregates for a single asset pair.
     pub async fn get(
@@ -20,7 +23,7 @@ impl HttpClient<RateAggregates> {
         let timestamp_gte = start_date_inclusive
             .and_hms_opt(0, 0, 0)
             .expect("invalid time");
-        let timestamp_lt = (end_date_inclusive + Duration::days(1))
+        let timestamp_lt = (end_date_inclusive + ONE_DAY)
             .and_hms_opt(0, 0, 0)
             .expect("invalid time");
 
@@ -101,7 +104,7 @@ impl HttpClient<RateAggregates> {
         let timestamp_gte = start_date_inclusive
             .and_hms_opt(0, 0, 0)
             .expect("invalid time");
-        let timestamp_lt = (end_date_inclusive + Duration::days(1))
+        let timestamp_lt = (end_date_inclusive + ONE_DAY)
             .and_hms_opt(0, 0, 0)
             .expect("invalid time");
 

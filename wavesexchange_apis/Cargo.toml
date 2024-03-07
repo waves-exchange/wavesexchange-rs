@@ -8,7 +8,7 @@ authors = ["Artem Sidorenko <kronos44_0@mail.ru>"]
 # Using bigdecimal which is compatible with diesel: Diesel 1.x requires 0.1, Diesel 2.0 can use up to 0.3, Diesel 2.1 uses 0.4
 bigdecimal = { version = ">=0.0.13, < 0.5.0", features = ["serde"] }
 bs58 = "0.5"
-chrono = { version = "0.4", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.35", default-features = false, features = ["serde"] }
 futures = { version = "0.3", default-features = false }
 itertools = "0.12"
 percent-encoding = "2"
