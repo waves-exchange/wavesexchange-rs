@@ -10,12 +10,14 @@ use std::{
     fmt::Debug,
     future::Future,
     sync::{Arc, Mutex},
+    time::Instant,
 };
 use tokio::{
     sync::{mpsc, oneshot},
     task,
 };
 use warp::{filters::BoxedFilter, log::Info, Filter, Rejection, Reply};
+use wavesexchange_log::info;
 
 lazy_static! {
     static ref REQUESTS: IntCounter =
@@ -196,6 +198,7 @@ impl MetricsWarpBuilder {
     /// tx.send(()).unwrap();
     /// ```
     pub fn with_init_channel(mut self, chn: oneshot::Receiver<()>) -> Self {
+        let start = Instant::now();
         let is_initialized = Arc::new(Mutex::new(false));
 
         task::spawn({
@@ -203,6 +206,7 @@ impl MetricsWarpBuilder {
             async move {
                 match chn.await {
                     Ok(()) => {
+                        info!("Service initialization completed in {:?}", start.elapsed());
                         let mut is_initialized = is_initialized.lock().unwrap();
                         *is_initialized = true;
                     }
