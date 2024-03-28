@@ -13,5 +13,6 @@ pub use api_clients::*;
 // Reexport crates
 pub extern crate bigdecimal;
 pub extern crate chrono;
+pub extern crate reqwest;
 
 pub use wavesexchange_warp::pagination;
