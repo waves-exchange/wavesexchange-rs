@@ -280,7 +280,7 @@ pub mod dto {
     }
 
     #[derive(Clone, Debug, Deserialize)]
-    pub struct OracleData(HashMap<String, DataEntryValue>);
+    pub struct OracleData(pub HashMap<String, DataEntryValue>);
 
     #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Deserialize, Serialize)]
     #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
